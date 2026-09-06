@@ -11,6 +11,8 @@ npm test
 npm run build
 ```
 
+相同门禁也由 GitHub Actions 在 Ubuntu + Node.js 22 上对 `main` 和 Pull Request 自动执行。
+
 `npm run demo` 覆盖两个端到端场景：
 
 1. 确定性失败 Trace 经过去重、独立 Git worktree 复现和自动策略晋升，形成 active Case。
