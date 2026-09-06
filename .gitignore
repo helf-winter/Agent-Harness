@@ -1,0 +1,8 @@
+node_modules/
+dist/
+coverage/
+.harness/
+*.log
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal

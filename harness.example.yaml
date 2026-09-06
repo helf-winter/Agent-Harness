@@ -1,0 +1,35 @@
+version: 1
+
+runtime:
+  mode: managed
+  minimumClaudeCodeVersion: 2.1.220
+
+scope:
+  registry: global
+
+validation:
+  repetitions: 3
+  requireAllDevelopmentCases: true
+  requireAllValidationCases: true
+  requireAllRegressionCases: true
+  requireAllHoldoutCases: true
+  autoPromote: true
+
+project:
+  packageManager: auto
+  testCommand: auto
+  buildCommand: auto
+
+isolation:
+  type: git-worktree
+  requireCleanFixture: true
+  inheritEnvironment: false
+  network: disabled
+
+collection:
+  prompts: redacted
+  finalResponses: redacted
+  toolInputs: redacted
+  toolOutputs: summary
+  fileDiffs: redacted
+  environmentVariables: deny
