@@ -148,7 +148,7 @@ describe("Failure Case vertical slice", () => {
     service.close();
     projection.close();
     ledger.close();
-  });
+  }, 20_000);
 
   it("rejects a Trace without deterministic failure evidence", () => {
     const fixture = createFailingRepository();

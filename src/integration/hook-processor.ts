@@ -1,5 +1,7 @@
-import { randomUUID } from "node:crypto";
-import { appendFileSync, mkdirSync } from "node:fs";
+import { spawn } from "node:child_process";
+import { createHash, randomUUID } from "node:crypto";
+import { appendFileSync, existsSync, mkdirSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { EVENT_TYPES } from "../domain/event-types.js";
 import { createEventId, type CapturedEvent, type EventContext } from "../domain/events.js";
@@ -128,6 +130,10 @@ export class HookProcessor {
     }
     this.#projection.projectPending(this.#ledger);
 
+    if (input.hook_event_name === "Stop" && trace) {
+      scheduleEvolution(trace.traceId, input.cwd);
+    }
+
     return {
       appendedEvents,
       sessionId,
@@ -216,6 +222,20 @@ export class HookProcessor {
   }
 }
 
+function scheduleEvolution(traceId: string, repositoryDirectory: string): void {
+  if (process.env.HARNESS_AUTO_EVOLVE === "0") return;
+  const cliPath = fileURLToPath(new URL("../cli.js", import.meta.url));
+  if (!existsSync(cliPath) || !process.env.HARNESS_DB_PATH) return;
+  const child = spawn(process.execPath, [cliPath, "evolve", traceId, repositoryDirectory], {
+    cwd: repositoryDirectory,
+    detached: true,
+    stdio: "ignore",
+    windowsHide: true,
+    env: process.env,
+  });
+  child.unref();
+}
+
 function mapHookEvent(input: ClaudeHookInput, context: EventContext): CapturedEvent | undefined {
   const common = {
     ...context,
@@ -248,7 +268,7 @@ function mapHookEvent(input: ClaudeHookInput, context: EventContext): CapturedEv
         payload: {
           toolName: input.tool_name ?? "unknown",
           toolInput: input.tool_input ?? {},
-          toolResponse: input.tool_response ?? null,
+          toolResponseSummary: summarizeHookValue(input.tool_response),
         },
       };
     }
@@ -268,12 +288,15 @@ function mapHookEvent(input: ClaudeHookInput, context: EventContext): CapturedEv
     }
     case "Stop":
       if (!context.turnId) return undefined;
+      const finalResponse = input.last_assistant_message ?? "";
       return {
         ...common,
         eventType: EVENT_TYPES.TURN_ENDED,
         payload: {
           failed: false,
-          finalResponse: input.last_assistant_message ?? "",
+          finalResponsePreview: promptPreview(finalResponse),
+          finalResponseLength: finalResponse.length,
+          finalResponseSha256: createHash("sha256").update(finalResponse).digest("hex"),
         },
       };
     case "StopFailure":
@@ -313,6 +336,18 @@ function promptPreview(prompt: string): string {
 
 function normalizeEventName(name: string): string {
   return name.replace(/([a-z0-9])([A-Z])/g, "$1_$2").replace(/[^a-zA-Z0-9]+/g, "_").toLowerCase();
+}
+
+function summarizeHookValue(value: unknown): unknown {
+  if (value === undefined || value === null) return null;
+  const serialized = typeof value === "string" ? value : JSON.stringify(value);
+  if (serialized.length <= 4_000) return value;
+  return {
+    truncated: true,
+    originalLength: serialized.length,
+    preview: serialized.slice(0, 4_000),
+    sha256: createHash("sha256").update(serialized).digest("hex"),
+  };
 }
 
 export function processHookFromEnvironment(input: ClaudeHookInput): HookProcessResult {

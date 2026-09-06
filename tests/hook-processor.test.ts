@@ -74,6 +74,12 @@ describe("Claude Code Hook processor", () => {
     expect(
       events.find((event) => event.eventType === "tool.requested")?.payload.toolInput,
     ).toEqual({ command: "API_KEY=<REDACTED> npm test" });
+    const stopped = events.find((event) => event.eventType === "turn.ended");
+    expect(stopped?.payload).not.toHaveProperty("finalResponse");
+    expect(stopped?.payload).toMatchObject({
+      finalResponsePreview: "I found the failure.",
+      finalResponseLength: 20,
+    });
     const traceEvidence = ledger.listTraceEvidence(
       firstTurn.traceId!,
       firstTurn.taskId!,

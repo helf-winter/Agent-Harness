@@ -203,6 +203,18 @@ export class EventLedger {
     return rows.map((row) => JSON.parse(row.envelope_json) as EventEnvelope);
   }
 
+  listByCorrelation(correlationId: string): EventEnvelope[] {
+    const rows = this.#database
+      .prepare(`
+        SELECT envelope_json FROM events
+        WHERE correlation_id = ?
+           OR (correlation_id IS NULL AND json_extract(envelope_json, '$.correlationId') = ?)
+        ORDER BY sequence ASC
+      `)
+      .all(correlationId, correlationId) as Array<Pick<EventRow, "envelope_json">>;
+    return rows.map((row) => JSON.parse(row.envelope_json) as EventEnvelope);
+  }
+
   listTraceEvidence(traceId: string, taskId: string, sessionId: string): EventEnvelope[] {
     const rows = this.#database
       .prepare(`

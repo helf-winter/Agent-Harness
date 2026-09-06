@@ -15,6 +15,15 @@ export const EVENT_TYPES = {
   CASE_CREATED: "case.created",
   CASE_STATUS_CHANGED: "case.status_changed",
   CASE_REPRODUCTION_RECORDED: "case.reproduction_recorded",
+  CASE_SPLIT_CHANGED: "case.split_changed",
+  EXPERIENCE_CREATED: "experience.created",
+  EXPERIENCE_STATUS_CHANGED: "experience.status_changed",
+  RECALL_PERFORMED: "recall.performed",
+  RECALL_FEEDBACK_RECORDED: "recall.feedback_recorded",
+  SKILL_CREATED: "skill.created",
+  SKILL_STATUS_CHANGED: "skill.status_changed",
+  VALIDATION_COMPLETED: "validation.completed",
+  SKILL_INVOCATION_RECORDED: "skill.invocation_recorded",
 } as const;
 
 export type HarnessEventType = (typeof EVENT_TYPES)[keyof typeof EVENT_TYPES];

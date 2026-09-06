@@ -3,8 +3,11 @@ import { EVENT_TYPES } from "../domain/event-types.js";
 import type { Stage } from "../domain/lifecycle.js";
 import { discoverEvaluationPlan } from "../evaluation/command-discovery.js";
 import { ResultEvaluator, type EvaluationReport } from "../evaluation/result-evaluator.js";
+import { ExperienceStore } from "../experiences/experience-store.js";
 import { LifecycleController } from "../lifecycle/controller.js";
 import { ProjectionStore } from "../projections/projection-store.js";
+import { RecallEngine, type RecallResult } from "../recall/recall-engine.js";
+import { SkillRegistry } from "../skills/skill-registry.js";
 import { EventLedger } from "../storage/event-ledger.js";
 
 export interface HarnessContext {
@@ -22,6 +25,9 @@ export interface HarnessContext {
 export class HarnessService {
   readonly #ledger: EventLedger;
   readonly #projection: ProjectionStore;
+  readonly #experiences: ExperienceStore;
+  readonly #skills: SkillRegistry;
+  readonly #recall: RecallEngine;
 
   constructor(
     databasePath: string,
@@ -29,6 +35,14 @@ export class HarnessService {
   ) {
     this.#ledger = new EventLedger(databasePath);
     this.#projection = new ProjectionStore(databasePath);
+    this.#experiences = new ExperienceStore(databasePath, this.#ledger, runtimeInstanceId);
+    this.#skills = new SkillRegistry(databasePath, this.#ledger, runtimeInstanceId);
+    this.#recall = new RecallEngine(
+      this.#ledger,
+      this.#experiences,
+      this.#skills,
+      runtimeInstanceId,
+    );
     this.#projection.projectPending(this.#ledger);
   }
 
@@ -230,7 +244,45 @@ export class HarnessService {
     return report;
   }
 
+  recall(input: {
+    technologies: string[];
+    errorContext?: string;
+    tokenBudget: number;
+    disabled?: boolean;
+  }): RecallResult {
+    const context = this.getContext();
+    return this.#recall.recall(context, {
+      taskType: "typescript-reproducible-test-repair",
+      technologies: input.technologies,
+      stage: context.currentStage,
+      taskSummary: context.taskTitle,
+      tokenBudget: input.tokenBudget,
+      ...(input.errorContext ? { errorContext: input.errorContext } : {}),
+      ...(input.disabled !== undefined ? { disabled: input.disabled } : {}),
+    });
+  }
+
+  recordRecallFeedback(
+    recallEventId: string,
+    assetId: string,
+    adopted: boolean,
+    reason: string,
+  ): { eventId: string } {
+    const context = this.getContext();
+    return {
+      eventId: this.#recall.recordFeedback(
+        context,
+        recallEventId,
+        assetId,
+        adopted,
+        reason,
+      ),
+    };
+  }
+
   close(): void {
+    this.#skills.close();
+    this.#experiences.close();
     this.#projection.close();
     this.#ledger.close();
   }

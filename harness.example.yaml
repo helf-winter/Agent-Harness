@@ -14,6 +14,18 @@ validation:
   requireAllRegressionCases: true
   requireAllHoldoutCases: true
   autoPromote: true
+  credentialEnvironmentVariable: HARNESS_VALIDATION_API_KEY
+  readUserClaudeLogin: false
+
+evolution:
+  runAfterStop: true
+  disableEnvironmentVariable: HARNESS_AUTO_EVOLVE
+
+recall:
+  defaultTokenBudget: 2048
+  exposeExperienceStatuses: [usable]
+  exposeSkillStatuses: [completed]
+  recordFeedback: true
 
 project:
   packageManager: auto

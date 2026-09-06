@@ -6,7 +6,7 @@ import Database from "better-sqlite3";
 import { EVENT_TYPES } from "../domain/event-types.js";
 import type { EventEnvelope } from "../domain/events.js";
 import type { EventLedger, StoredEvent } from "../storage/event-ledger.js";
-import type { CaseStatus, FailureCase, ReproductionRecord } from "./types.js";
+import type { CaseSplit, CaseStatus, FailureCase, ReproductionRecord } from "./types.js";
 
 const require = createRequire(import.meta.url);
 const Ajv2020 = require("ajv/dist/2020") as typeof import("ajv/dist/2020.js").default;
@@ -103,6 +103,12 @@ export class CaseRegistry {
     if (!STATUS_TRANSITIONS[current.status].includes(to)) {
       throw new Error(`Invalid Case transition: ${current.status} -> ${to}`);
     }
+    if (to === "reproducible") {
+      const evidence = this.#database
+        .prepare("SELECT 1 FROM case_reproductions WHERE case_id = ? AND reproduced = 1 LIMIT 1")
+        .get(caseId);
+      if (!evidence) throw new Error("Case reproducible status requires a successful isolated reproduction record.");
+    }
     this.ledger.append({
       eventType: EVENT_TYPES.CASE_STATUS_CHANGED,
       runtimeInstanceId: this.runtimeInstanceId,
@@ -129,6 +135,24 @@ export class CaseRegistry {
     });
     this.projectPending();
     return result.event.eventId;
+  }
+
+  assignSplit(caseId: string, split: CaseSplit, reason: string): FailureCase {
+    const current = this.getRequired(caseId);
+    if (!reason.trim()) throw new Error("Case split assignment reason is required.");
+    if (current.status === "deprecated") throw new Error("A deprecated Case cannot change split.");
+    if (current.split === split) return current;
+    this.ledger.append({
+      eventType: EVENT_TYPES.CASE_SPLIT_CHANGED,
+      runtimeInstanceId: this.runtimeInstanceId,
+      correlationId: caseId,
+      actor: { type: "controller", id: "case-dataset-controller" },
+      source: { adapter: "harness-core", adapterVersion: "0.2.0" },
+      policyVersion: "case-split-policy-1",
+      payload: { caseId, from: current.split, to: split, reason },
+    });
+    this.projectPending();
+    return this.getRequired(caseId);
   }
 
   projectPending(): number {
@@ -223,6 +247,23 @@ export class CaseRegistry {
       this.#database
         .prepare("UPDATE cases SET status = ?, document_json = ?, updated_at = ? WHERE case_id = ?")
         .run(to, JSON.stringify(failureCase), event.occurredAt, caseId);
+      return;
+    }
+
+    if (event.eventType === EVENT_TYPES.CASE_SPLIT_CHANGED) {
+      const caseId = requiredString(event.payload.caseId, "caseId", event);
+      const split = requiredString(event.payload.to, "to", event) as CaseSplit;
+      const row = this.#database.prepare("SELECT * FROM cases WHERE case_id = ?").get(caseId) as
+        | CaseRow
+        | undefined;
+      if (!row) throw new Error(`Cannot project split change for unknown Case ${caseId}.`);
+      const failureCase = JSON.parse(row.document_json) as FailureCase;
+      failureCase.split = split;
+      failureCase.updatedAt = event.occurredAt;
+      this.#assertValid(failureCase);
+      this.#database
+        .prepare("UPDATE cases SET split = ?, document_json = ?, updated_at = ? WHERE case_id = ?")
+        .run(split, JSON.stringify(failureCase), event.occurredAt, caseId);
       return;
     }
 

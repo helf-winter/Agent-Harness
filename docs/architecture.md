@@ -1,6 +1,6 @@
 # Agent Harness 架构基线
 
-状态：M0 初稿  
+状态：纵向 MVP 实现基线
 需求来源：[REQUIREMENTS.md](../REQUIREMENTS.md)
 
 ## 1. 已冻结的产品决策
@@ -68,7 +68,7 @@ Turn 不直接置于 Task 层级下。`turn_task_links` 保存一个主 Task 和
 - 已脱敏 payload 或内容寻址的 artifact 引用。
 - 前一事件哈希和当前事件哈希。
 
-查询模型由投影器生成。首批投影包括 Session、Task、Task-Turn、Trace、Stage 和 Result。Case、Experience、Skill 与 Validation Run 在后续里程碑加入。
+查询模型由投影器生成，包括 Session、Task、Task-Turn、Trace、Stage、Result、Case、Experience、Skill 与 Validation Run。各投影保存独立消费 offset，可由追加事件账本重放。
 
 重复消费使用 `eventId` 幂等；同一 ID 对应不同内容时视为数据损坏。
 
@@ -90,13 +90,18 @@ MVP 中 Skill 自动晋升要求：
 
 申请白名单外危险工具的 Skill 不进入人工审批，而是直接验证失败。线上回归达到策略阈值后自动进入 `quarantined`。
 
-## 7. M0/M1 交付顺序
+## 7. 已实现的纵向闭环
 
-1. 冻结事件信封、状态机和 ID 语义。
-2. 建立追加事件账本、脱敏器、哈希链和幂等写入。
-3. 建立 Claude Code capability/版本检查。
-4. 实现 Session、Task、Trace 和 Stage 的基础投影。
-5. 实现 Hook 到事件类型的覆盖矩阵和契约 Fixture。
-6. 接入 managed runner 与 Harness MCP。
+1. Claude Code Hook 和 MCP 形成 managed 生命周期，确定性 Result Evaluator 控制完成门禁。
+2. 失败结果经 Curator、Schema、指纹去重和独立 worktree 复现进入 active Case。
+3. 成功结果生成带作用域和证据的 usable Experience，再生成 `testing` Skill。
+4. Validation Agent 对四类 active Case 各运行三次，先确认无 Skill 失败基线，再执行候选 Skill 和 solution Oracle。
+5. Lifecycle Controller 只接受完整、通过的 Validation Report，将 Skill 自动晋升为 `completed`。
+6. Recall Engine 仅暴露 usable Experience 和 completed Skill，并记录排序、预算和采用反馈。
+7. completed Skill 连续两次高严重度生产失败后自动进入 `quarantined`，随即退出生产召回。
 
-以上项目已经完成。M1 的 COMPLETE 门禁只接受 `result.evaluated` 且 outcome 为 `success` 的真实事件；Agent 提供不存在或属于其他 Trace 的证据 ID 时，Lifecycle Controller 会拒绝转换。
+所有关键状态改变都由不可变事件驱动。Agent 提供不存在、越界或不满足策略的证据 ID 时，Lifecycle Controller 会拒绝转换。
+
+## 8. 独立验证边界
+
+Validation Runner 使用临时 Git worktree，继承的是白名单环境变量，不读取用户 Claude 登录。真实 Claude 验证使用单独的 `HARNESS_VALIDATION_API_KEY`，并以 `--bare` 模式运行；工具范围限制为读取、编辑、测试、构建、类型检查和 `git diff`。worktree 解决代码状态隔离，不等价于容器级 OS 隔离，因此网络和系统调用的更强硬隔离属于下一阶段。

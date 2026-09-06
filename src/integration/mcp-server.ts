@@ -90,6 +90,42 @@ server.registerTool(
 );
 
 server.registerTool(
+  "harness_recall",
+  {
+    description:
+      "Recall globally shared usable Experiences and completed Skills for the current Task and stage. Call at RECALL, after substantive plan changes, and after tool or test failures.",
+    inputSchema: {
+      technologies: z.array(z.string().min(1)).default(["typescript", "node"]),
+      errorContext: z.string().optional(),
+      tokenBudget: z.number().int().min(128).max(8192).default(2048),
+      disabled: z.boolean().default(false),
+    },
+  },
+  async ({ technologies, errorContext, tokenBudget, disabled }) =>
+    textResult(service.recall({
+      technologies,
+      tokenBudget,
+      disabled,
+      ...(errorContext ? { errorContext } : {}),
+    })),
+);
+
+server.registerTool(
+  "harness_record_recall_feedback",
+  {
+    description: "Record whether a recalled Experience or Skill was adopted and why.",
+    inputSchema: {
+      recallEventId: z.string().min(1),
+      assetId: z.string().min(1),
+      adopted: z.boolean(),
+      reason: z.string().min(1),
+    },
+  },
+  async ({ recallEventId, assetId, adopted, reason }) =>
+    textResult(service.recordRecallFeedback(recallEventId, assetId, adopted, reason)),
+);
+
+server.registerTool(
   "harness_evaluate_project",
   {
     description:
