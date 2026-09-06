@@ -28,6 +28,12 @@ interface EventRow {
   chain_hash: string;
 }
 
+export interface StoredEvent {
+  sequence: number;
+  chainHash: string;
+  event: EventEnvelope;
+}
+
 export interface AppendResult {
   sequence: number;
   chainHash: string;
@@ -62,6 +68,7 @@ export class EventLedger {
         task_id TEXT,
         trace_id TEXT,
         turn_id TEXT,
+        correlation_id TEXT,
         fingerprint TEXT NOT NULL,
         envelope_json TEXT NOT NULL,
         previous_hash TEXT,
@@ -77,6 +84,13 @@ export class EventLedger {
         BEFORE DELETE ON events
         BEGIN SELECT RAISE(ABORT, 'events are immutable'); END;
     `);
+    const eventColumns = this.#database.pragma("table_info(events)") as Array<{ name: string }>;
+    if (!eventColumns.some((column) => column.name === "correlation_id")) {
+      this.#database.exec("ALTER TABLE events ADD COLUMN correlation_id TEXT");
+    }
+    this.#database.exec(
+      "CREATE INDEX IF NOT EXISTS events_by_correlation ON events(correlation_id, sequence)",
+    );
 
     const schemaPath = fileURLToPath(
       new URL("../../schemas/event-envelope.schema.json", import.meta.url),
@@ -150,8 +164,8 @@ export class EventLedger {
           INSERT INTO events (
             event_id, event_type, occurred_at, recorded_at,
             runtime_instance_id, session_id, task_id, trace_id, turn_id,
-            fingerprint, envelope_json, previous_hash, chain_hash
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            correlation_id, fingerprint, envelope_json, previous_hash, chain_hash
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `)
         .run(
           event.eventId,
@@ -163,6 +177,7 @@ export class EventLedger {
           event.taskId ?? null,
           event.traceId ?? null,
           event.turnId ?? null,
+          event.correlationId,
           fingerprint,
           envelopeJson,
           previousHash,
@@ -186,6 +201,43 @@ export class EventLedger {
       .prepare("SELECT envelope_json FROM events WHERE trace_id = ? ORDER BY sequence ASC")
       .all(traceId) as Array<Pick<EventRow, "envelope_json">>;
     return rows.map((row) => JSON.parse(row.envelope_json) as EventEnvelope);
+  }
+
+  listTraceEvidence(traceId: string, taskId: string, sessionId: string): EventEnvelope[] {
+    const rows = this.#database
+      .prepare(`
+        SELECT envelope_json FROM events
+        WHERE trace_id = ?
+           OR correlation_id = ?
+           OR (correlation_id IS NULL AND json_extract(envelope_json, '$.correlationId') = ?)
+           OR (task_id = ? AND event_type = 'task.created')
+           OR (session_id = ? AND event_type IN ('session.started', 'session.resumed'))
+        ORDER BY sequence ASC
+      `)
+      .all(traceId, traceId, traceId, taskId, sessionId) as Array<Pick<EventRow, "envelope_json">>;
+    return rows.map((row) => JSON.parse(row.envelope_json) as EventEnvelope);
+  }
+
+  getByIds(eventIds: string[]): EventEnvelope[] {
+    if (eventIds.length === 0) return [];
+    const placeholders = eventIds.map(() => "?").join(", ");
+    const rows = this.#database
+      .prepare(`SELECT envelope_json FROM events WHERE event_id IN (${placeholders})`)
+      .all(...eventIds) as Array<Pick<EventRow, "envelope_json">>;
+    return rows.map((row) => JSON.parse(row.envelope_json) as EventEnvelope);
+  }
+
+  readAfter(sequence: number, limit = 1_000): StoredEvent[] {
+    const rows = this.#database
+      .prepare(
+        "SELECT sequence, envelope_json, chain_hash FROM events WHERE sequence > ? ORDER BY sequence ASC LIMIT ?",
+      )
+      .all(sequence, limit) as EventRow[];
+    return rows.map((row) => ({
+      sequence: row.sequence,
+      chainHash: row.chain_hash,
+      event: JSON.parse(row.envelope_json) as EventEnvelope,
+    }));
   }
 
   verifyChain(): ChainVerification {

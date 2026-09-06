@@ -98,3 +98,5 @@ MVP 中 Skill 自动晋升要求：
 4. 实现 Session、Task、Trace 和 Stage 的基础投影。
 5. 实现 Hook 到事件类型的覆盖矩阵和契约 Fixture。
 6. 接入 managed runner 与 Harness MCP。
+
+以上项目已经完成。M1 的 COMPLETE 门禁只接受 `result.evaluated` 且 outcome 为 `success` 的真实事件；Agent 提供不存在或属于其他 Trace 的证据 ID 时，Lifecycle Controller 会拒绝转换。

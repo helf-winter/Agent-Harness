@@ -111,6 +111,31 @@ export class LifecycleController {
     if (state.sessionId !== input.sessionId || state.taskId !== input.taskId) {
       throw new Error("Trace scope does not match its original Session and Task.");
     }
+    const evidence = this.ledger.getByIds(input.evidenceEventIds);
+    if (evidence.length !== new Set(input.evidenceEventIds).size) {
+      throw new Error("One or more evidence events do not exist.");
+    }
+    if (
+      evidence.some(
+        (event) => {
+          const inTrace = event.traceId === input.traceId || event.correlationId === input.traceId;
+          const atTaskScope = event.taskId === input.taskId && !event.traceId;
+          const atSessionScope = event.sessionId === input.sessionId && !event.taskId;
+          return !inTrace && !atTaskScope && !atSessionScope;
+        },
+      )
+    ) {
+      throw new Error("Evidence belongs to a different Trace scope.");
+    }
+    if (
+      input.to === "COMPLETE" &&
+      !evidence.some(
+        (event) =>
+          event.eventType === EVENT_TYPES.RESULT_EVALUATED && event.payload.outcome === "success",
+      )
+    ) {
+      throw new Error("COMPLETE requires a successful Result Evaluator event.");
+    }
 
     const decision = decideTransition({
       from: state.currentStage,

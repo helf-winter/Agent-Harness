@@ -1,0 +1,120 @@
+#!/usr/bin/env node
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { z } from "zod";
+import { STAGES } from "../domain/lifecycle.js";
+import { HarnessService } from "./harness-service.js";
+import { harnessDatabasePath } from "./paths.js";
+
+const runtimeInstanceId = process.env.HARNESS_RUNTIME_INSTANCE_ID;
+if (!runtimeInstanceId) {
+  throw new Error("HARNESS_RUNTIME_INSTANCE_ID is required.");
+}
+
+const service = new HarnessService(harnessDatabasePath(), runtimeInstanceId);
+const server = new McpServer({ name: "agent-harness", version: "0.1.0" });
+
+server.registerTool(
+  "harness_get_context",
+  {
+    description:
+      "Read the current Harness Task, Trace, lifecycle stage, and recent evidence IDs. Call this before requesting a stage transition.",
+    inputSchema: {},
+  },
+  async () => textResult(service.getContext()),
+);
+
+server.registerTool(
+  "harness_list_tasks",
+  {
+    description:
+      "List Tasks in the current Session, including which Task is focused and each active lifecycle stage.",
+    inputSchema: {},
+  },
+  async () => textResult(service.listTasks()),
+);
+
+server.registerTool(
+  "harness_create_task",
+  {
+    description:
+      "Create and focus a new Task when the current user prompt is an independent goal rather than a continuation of the focused Task.",
+    inputSchema: {
+      title: z.string().min(1).max(160),
+      reason: z.string().min(1),
+    },
+  },
+  async ({ title, reason }) => textResult(service.createAndFocusTask(title, reason)),
+);
+
+server.registerTool(
+  "harness_focus_task",
+  {
+    description:
+      "Focus an existing active Task when the user returns to an earlier goal. Use harness_list_tasks to obtain valid Task IDs.",
+    inputSchema: {
+      taskId: z.string().min(1),
+      reason: z.string().min(1),
+    },
+  },
+  async ({ taskId, reason }) => textResult(service.focusTask(taskId, reason)),
+);
+
+server.registerTool(
+  "harness_record_observation",
+  {
+    description:
+      "Record a stage-local observation backed by existing Trace evidence. Returns an event ID that can support a lifecycle transition.",
+    inputSchema: {
+      summary: z.string().min(1),
+      evidenceEventIds: z.array(z.string().min(1)).min(1),
+    },
+  },
+  async ({ summary, evidenceEventIds }) =>
+    textResult(service.recordObservation(summary, evidenceEventIds)),
+);
+
+server.registerTool(
+  "harness_transition_stage",
+  {
+    description:
+      "Request a deterministic lifecycle stage transition. The controller rejects skipped stages and nonexistent or out-of-scope evidence.",
+    inputSchema: {
+      to: z.enum(STAGES),
+      reason: z.string().min(1),
+      evidenceEventIds: z.array(z.string().min(1)).min(1),
+    },
+  },
+  async ({ to, reason, evidenceEventIds }) =>
+    textResult(service.transitionStage(to, reason, evidenceEventIds)),
+);
+
+server.registerTool(
+  "harness_evaluate_project",
+  {
+    description:
+      "Run the configured or automatically discovered deterministic typecheck, build, and test graders. Only available in VERIFY or REVIEW.",
+    inputSchema: {},
+  },
+  async () =>
+    textResult(
+      service.evaluateProject(process.env.HARNESS_PROJECT_DIR ?? process.cwd()),
+    ),
+);
+
+process.on("SIGINT", () => {
+  service.close();
+  process.exit(0);
+});
+process.on("SIGTERM", () => {
+  service.close();
+  process.exit(0);
+});
+
+await server.connect(new StdioServerTransport());
+
+function textResult(value: unknown) {
+  return {
+    content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }],
+  };
+}

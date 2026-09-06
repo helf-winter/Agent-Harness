@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "harness": {
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/../dist/integration/mcp-server.js"]
+    }
+  }
+}
