@@ -143,12 +143,12 @@ export class ResultEvaluator {
   }
 }
 
-function summarizeOutput(output: string): string {
+export function summarizeOutput(output: string): string {
   const limit = 32_000;
   return output.length <= limit ? output : `${output.slice(0, limit)}\n<TRUNCATED>`;
 }
 
-function sanitizedEnvironment(): NodeJS.ProcessEnv {
+export function sanitizedEnvironment(): NodeJS.ProcessEnv {
   const allowed = [
     "PATH",
     "Path",

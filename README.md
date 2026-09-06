@@ -2,7 +2,7 @@
 
 基于 Claude Code 的研发流程 Harness。项目目标是把研发任务执行记录为可追溯 Trace，将失败沉淀为可复现 Case，将经过验证的成功模式演化为可自动验证、晋升和隔离的 Skill。
 
-当前状态：M1 生命周期采集、投影和确定性结果评价已形成可运行闭环。
+当前状态：M2 已完成，失败 Trace 可以转为可复现、自动晋升的全局 Case。
 
 ## 当前已实现
 
@@ -20,6 +20,11 @@
 - Harness MCP 上下文、Task 创建/切换、Observation 和阶段转换工具。
 - 自动发现 TypeScript 项目的 typecheck、build 和 test 命令。
 - 确定性 Result Evaluator；没有成功评价时不能进入 `COMPLETE`。
+- 版本化 Failure Case Schema、指纹去重和全局 Case Registry。
+- 仅接收确定性测试失败的 Failure Case Curator。
+- 使用临时 Git worktree 和可选工作区补丁进行隔离复现。
+- `raw → triaged → reproducible → approved → active` 自动晋升状态机。
+- 复现记录与生命周期变更均写入不可变事件账本。
 
 ## 环境要求
 
@@ -39,6 +44,9 @@ npm test
 npm run build
 npm run dev -- run
 npm run dev -- trace list
+npm run dev -- case list
+npm run dev -- case curate <trace-id>
+npm run dev -- case reproduce <case-id>
 ```
 
 ## 主要文档
@@ -50,7 +58,7 @@ npm run dev -- trace list
 
 ## 当前里程碑
 
-下一步进入 M2：定义 Case Schema、Failure Case Curator 和 Git worktree Reproduction Runner，将失败 Trace 转换为第一个可复现 Case。
+下一步进入 M3：把成功 Trace 提炼为 Experience，生成候选 Skill，并用 active Case 做隔离验证和自动晋升。
 
 ## 当前限制
 

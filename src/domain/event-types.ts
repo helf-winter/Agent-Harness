@@ -12,6 +12,9 @@ export const EVENT_TYPES = {
   TRACE_ENDED: "trace.ended",
   STAGE_TRANSITIONED: "stage.transitioned",
   RESULT_EVALUATED: "result.evaluated",
+  CASE_CREATED: "case.created",
+  CASE_STATUS_CHANGED: "case.status_changed",
+  CASE_REPRODUCTION_RECORDED: "case.reproduction_recorded",
 } as const;
 
 export type HarnessEventType = (typeof EVENT_TYPES)[keyof typeof EVENT_TYPES];

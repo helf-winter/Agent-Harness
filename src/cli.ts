@@ -4,6 +4,8 @@ import { randomUUID } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { delimiter, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { FailureCaseService } from "./cases/failure-case-service.js";
+import type { CaseStatus, FailureCase } from "./cases/types.js";
 import { harnessDatabasePath, stableProjectId } from "./integration/paths.js";
 import { ProjectionStore } from "./projections/projection-store.js";
 import { EventLedger } from "./storage/event-ledger.js";
@@ -206,6 +208,92 @@ function showTrace(traceId: string | undefined): number {
   return 0;
 }
 
+function withCaseService<T>(callback: (service: FailureCaseService) => T): T {
+  const databasePath = harnessDatabasePath();
+  const ledger = new EventLedger(databasePath);
+  const projection = new ProjectionStore(databasePath);
+  const service = new FailureCaseService(databasePath, ledger, projection);
+  try {
+    return callback(service);
+  } finally {
+    service.close();
+    projection.close();
+    ledger.close();
+  }
+}
+
+function listCases(status?: string): number {
+  const allowed = ["raw", "triaged", "reproducible", "approved", "active", "deprecated"];
+  if (status && !allowed.includes(status)) {
+    console.error(`Invalid Case status: ${status}`);
+    return 1;
+  }
+  const cases = withCaseService((service) => service.registry.list(status as CaseStatus | undefined));
+  if (cases.length === 0) {
+    console.log("No matching Cases exist.");
+    return 0;
+  }
+  console.table(
+    cases.map((failureCase) => ({
+      caseId: failureCase.caseId,
+      title: failureCase.title,
+      status: failureCase.status,
+      split: failureCase.split,
+      traceId: failureCase.source.traceId,
+    })),
+  );
+  return 0;
+}
+
+function curateCase(traceId: string | undefined): number {
+  if (!traceId) {
+    console.error("Usage: harness case curate <trace-id>");
+    return 1;
+  }
+  const result = withCaseService((service) => service.curate(traceId, process.cwd()));
+  console.log(JSON.stringify(result, null, 2));
+  return result.accepted ? 0 : 1;
+}
+
+function reproduceCase(caseId: string | undefined): number {
+  if (!caseId) {
+    console.error("Usage: harness case reproduce <case-id>");
+    return 1;
+  }
+  const result = withCaseService((service) =>
+    service.reproduceAndPromote(caseId, process.cwd()),
+  );
+  console.log(JSON.stringify(result, null, 2));
+  return result.reproduction.reproduced ? 0 : 1;
+}
+
+function showCase(caseId: string | undefined): number {
+  if (!caseId) {
+    console.error("Usage: harness case show <case-id>");
+    return 1;
+  }
+  const failureCase = withCaseService((service) => service.registry.get(caseId));
+  if (!failureCase) {
+    console.error(`Case not found: ${caseId}`);
+    return 1;
+  }
+  console.log(JSON.stringify(summarizeCase(failureCase), null, 2));
+  return 0;
+}
+
+function summarizeCase(failureCase: FailureCase): Record<string, unknown> {
+  return {
+    ...failureCase,
+    source: {
+      ...failureCase.source,
+      workingTreePatch:
+        failureCase.source.workingTreePatch.length === 0
+          ? ""
+          : `<${failureCase.source.workingTreePatch.length} character patch>`,
+    },
+  };
+}
+
 function help(): void {
   console.log(`Agent Harness
 
@@ -213,7 +301,11 @@ Usage:
   harness doctor
   harness run [claude arguments...]
   harness trace list
-  harness trace show <trace-id>`);
+  harness trace show <trace-id>
+  harness case list [status]
+  harness case show <case-id>
+  harness case curate <trace-id>
+  harness case reproduce <case-id>`);
 }
 
 const [command = "help", subcommand, argument] = process.argv.slice(2);
@@ -226,6 +318,18 @@ switch (command) {
     break;
   case "trace":
     process.exitCode = subcommand === "list" ? listTraces() : showTrace(argument);
+    break;
+  case "case":
+    process.exitCode =
+      subcommand === "list"
+        ? listCases(argument)
+        : subcommand === "show"
+          ? showCase(argument)
+          : subcommand === "curate"
+            ? curateCase(argument)
+            : subcommand === "reproduce"
+              ? reproduceCase(argument)
+              : (help(), 1);
     break;
   default:
     help();
