@@ -14,7 +14,9 @@ validation:
   requireAllRegressionCases: true
   requireAllHoldoutCases: true
   autoPromote: true
-  credentialEnvironmentVariable: HARNESS_VALIDATION_API_KEY
+  credentialEnvironmentVariable: HARNESS_VALIDATION_AUTH_TOKEN
+  baseUrlEnvironmentVariable: HARNESS_VALIDATION_BASE_URL
+  modelEnvironmentVariable: HARNESS_VALIDATION_MODEL
   readUserClaudeLogin: false
 
 evolution:

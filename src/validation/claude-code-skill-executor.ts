@@ -9,7 +9,9 @@ export class ClaudeCodeSkillExecutor implements SkillExecutor {
 
   constructor(
     private readonly executable = process.env.HARNESS_VALIDATION_CLAUDE_EXECUTABLE ?? "claude",
-    private readonly apiKey = process.env.HARNESS_VALIDATION_API_KEY,
+    private readonly apiKey = process.env.HARNESS_VALIDATION_AUTH_TOKEN ?? process.env.HARNESS_VALIDATION_API_KEY,
+    private readonly baseUrl = process.env.HARNESS_VALIDATION_BASE_URL,
+    private readonly model = process.env.HARNESS_VALIDATION_MODEL,
   ) {}
 
   execute(skill: HarnessSkill, failureCase: FailureCase, worktree: string): SkillExecutionResult {
@@ -18,7 +20,7 @@ export class ClaudeCodeSkillExecutor implements SkillExecutor {
         succeeded: false,
         tokenUsage: null,
         toolCalls: null,
-        detail: "HARNESS_VALIDATION_API_KEY is required; independent validation never reads the user's Claude login or keychain.",
+        detail: "HARNESS_VALIDATION_AUTH_TOKEN (or legacy HARNESS_VALIDATION_API_KEY) is required; independent validation never reads the user's Claude login or keychain.",
       };
     }
     const prompt = [
@@ -41,6 +43,7 @@ export class ClaudeCodeSkillExecutor implements SkillExecutor {
         "Read,Grep,Glob,Edit,Bash(npm test:*),Bash(npm run test:*),Bash(npm run typecheck:*),Bash(npm run build:*),Bash(git diff:*)",
         "--max-budget-usd",
         "1",
+        ...(this.model ? ["--model", this.model] : []),
         prompt,
       ],
       {
@@ -49,7 +52,20 @@ export class ClaudeCodeSkillExecutor implements SkillExecutor {
         shell: false,
         timeout: 10 * 60_000,
         maxBuffer: 4 * 1024 * 1024,
-        env: { ...sanitizedEnvironment(), ANTHROPIC_API_KEY: this.apiKey },
+        env: {
+          ...sanitizedEnvironment(),
+          ...(this.baseUrl
+            ? { ANTHROPIC_BASE_URL: this.baseUrl, ANTHROPIC_AUTH_TOKEN: this.apiKey }
+            : { ANTHROPIC_API_KEY: this.apiKey }),
+          ...(this.model
+            ? {
+                ANTHROPIC_MODEL: this.model,
+                ANTHROPIC_DEFAULT_OPUS_MODEL: this.model,
+                ANTHROPIC_DEFAULT_SONNET_MODEL: this.model,
+                ANTHROPIC_DEFAULT_HAIKU_MODEL: this.model,
+              }
+            : {}),
+        },
       },
     );
     const detail = child.status === 0

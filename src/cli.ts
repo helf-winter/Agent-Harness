@@ -451,7 +451,9 @@ function evolveTrace(traceId: string | undefined, repositoryDirectory?: string):
       cases,
       experiences,
       skills,
-      process.env.HARNESS_VALIDATION_API_KEY ? new ClaudeCodeSkillExecutor() : undefined,
+      process.env.HARNESS_VALIDATION_AUTH_TOKEN || process.env.HARNESS_VALIDATION_API_KEY
+        ? new ClaudeCodeSkillExecutor()
+        : undefined,
     ).processTrace(traceId, repository),
   );
   console.log(JSON.stringify(result, null, 2));

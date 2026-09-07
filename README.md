@@ -64,6 +64,42 @@ npm run dev -- skill export <skill-id>
 npm run dev -- evolve <trace-id>
 ```
 
+## Claude Code 模型供应商
+
+Claude Code 使用 Anthropic 协议，因此火山方舟在 Claude Code 中的 Base URL 是
+`https://ark.cn-beijing.volces.com/api/coding`。带 `/v3` 的地址是 OpenAI 协议入口，
+不能直接配置给 Claude Code。
+
+先在 WSL Bash 中创建只属于当前用户的密钥文件：
+
+```bash
+mkdir -p ~/.config/agent-harness
+cp config/claude-providers.env.example ~/.config/agent-harness/claude-providers.env
+chmod 600 ~/.config/agent-harness/claude-providers.env
+nano ~/.config/agent-harness/claude-providers.env
+```
+
+填入 `ARK_API_KEY` 和 `DEEPSEEK_API_KEY` 后，普通 `claude` 默认使用方舟
+`glm-5.3-flash`。也可用以下任一命令显式选择供应商和模型：
+
+```bash
+npm run claude:ark:glm
+npm run claude:ark:kimi
+npm run claude:deepseek:flash
+npm run claude:deepseek:pro
+```
+
+方舟模型分别为 `glm-5.3-flash`、`kimi-k2.7-code`；DeepSeek 使用官方 Anthropic
+兼容地址与当前模型 `deepseek-v4-flash`、`deepseek-v4-pro`。命令行环境变量优先于密钥文件。
+
+独立 Skill 验证可使用相同供应商，但必须提供单独的隔离验证密钥：
+
+```bash
+export HARNESS_VALIDATION_BASE_URL=https://ark.cn-beijing.volces.com/api/coding
+export HARNESS_VALIDATION_AUTH_TOKEN="$ARK_API_KEY"
+export HARNESS_VALIDATION_MODEL=glm-5.3-flash
+```
+
 ## 主要文档
 
 - [需求基线](./REQUIREMENTS.md)
@@ -77,8 +113,8 @@ npm run dev -- evolve <trace-id>
 
 ## 当前限制
 
-- Claude Code CLI 必须先完成 `/login` 才能执行真实模型任务。
-- 独立 Skill 验证刻意不读取用户 Claude 登录或系统钥匙串；真实验证需单独设置仅用于隔离验证的 `HARNESS_VALIDATION_API_KEY`。未设置时 Skill 保持 `testing`。
+- Claude Code CLI 执行真实模型任务前必须具备一种有效凭据：Anthropic 登录，或所选兼容供应商的 API Key。使用本项目的供应商启动命令时不需要再执行 `/login`。
+- 独立 Skill 验证刻意不读取用户 Claude 登录或系统钥匙串；真实验证需单独设置仅用于隔离验证的 `HARNESS_VALIDATION_AUTH_TOKEN`。第三方供应商还需设置 `HARNESS_VALIDATION_BASE_URL` 和 `HARNESS_VALIDATION_MODEL`；旧的 `HARNESS_VALIDATION_API_KEY` 仍向后兼容。未设置时 Skill 保持 `testing`。
 - Task 的语义分类由 Claude 通过 Harness MCP 完成，确定性投影和作用域检查由 Harness Core 完成。
 - 第一阶段验证环境以 Bash 为基准；原生 PowerShell 仅用于本项目开发，不属于正式运行目标。
 - Git worktree 隔离文件状态，但不是完整 OS/网络沙箱；验证器因此只开放读取、编辑和受限的 npm/git Bash 命令。高风险 Skill 会直接验证失败。

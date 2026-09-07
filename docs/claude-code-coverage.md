@@ -1,6 +1,6 @@
 # Claude Code 集成覆盖矩阵
 
-状态：核心 Hook 与 MCP 已在 Claude Code 2.1.220 实机验证；模型执行因本机 CLI 未登录而停在认证失败路径。
+状态：核心 Hook 与 MCP 已在 Claude Code 2.1.220 实机验证；供应商配置支持火山方舟和 DeepSeek 官方 Anthropic 兼容接口，真实模型连通性需在用户填写 API Key 后验证。
 
 | Harness 证据 | 首选来源 | 处理方式 |
 | --- | --- | --- |
@@ -30,5 +30,13 @@
 - Harness MCP 状态为 `connected`。
 - 上下文、Task、Observation、阶段转换和结果评价工具均进入 Claude Code 工具表。
 - SessionStart、UserPromptSubmit、StopFailure 和 SessionEnd 事件成功写入事件账本。
-- 未登录错误被记录为 `authentication_failed`，哈希链验证通过。
+- 当时的未登录错误被记录为 `authentication_failed`，哈希链验证通过。
 - 用户环境中的第三方 ACE 插件存在独立的 `${ACE_ROOT}` Session Hook 路径问题；该错误不来自 Agent Harness。
+
+## 2026-09-07 供应商迁移
+
+- 淘汰旧的本地 `127.0.0.1:3456` 网关配置。
+- 火山方舟 Claude Code 配置使用 Anthropic 协议入口 `https://ark.cn-beijing.volces.com/api/coding`；`/api/coding/v3` 仅用于 OpenAI 协议客户端。
+- 方舟配置提供 `glm-5.3-flash` 和 `kimi-k2.7-code` 两个启动档位。
+- DeepSeek 使用官方 Anthropic 协议入口 `https://api.deepseek.com/anthropic`，提供 `deepseek-v4-flash` 和 `deepseek-v4-pro` 两个启动档位。
+- API Key 不写入仓库；用户私有密钥文件权限固定为 `0600`。
