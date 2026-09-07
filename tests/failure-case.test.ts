@@ -133,10 +133,12 @@ describe("Failure Case vertical slice", () => {
       status: "triaged",
       taskType: "typescript-reproducible-test-repair",
       source: { commitSha: fixture.commitSha },
+      reproductionOracle: { command: "node" },
     });
 
     const promotion = service.reproduceAndPromote(curation.failureCase!.caseId, fixture.directory);
-    expect(promotion.reproduction).toMatchObject({ reproduced: true, exitCode: 3 });
+    expect(promotion.reproduction.reproduced, promotion.reproduction.stderr).toBe(true);
+    expect(promotion.reproduction.exitCode).toBe(3);
     expect(promotion.failureCase.status).toBe("active");
     expect(service.registry.list("active")).toHaveLength(1);
     expect(git(fixture.directory, ["worktree", "list", "--porcelain"]).match(/worktree /g)).toHaveLength(1);

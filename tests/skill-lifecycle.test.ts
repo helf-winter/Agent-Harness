@@ -121,8 +121,8 @@ function activeCase(registry: CaseRegistry, split: CaseSplit, commitSha: string)
       commitSha,
       workingTreePatch: "",
     },
-    reproductionOracle: { command: process.execPath, args: ["test.js"], timeoutMs: 10_000, expectedExitCode: 3 },
-    solutionOracle: { command: process.execPath, args: ["test.js"], timeoutMs: 10_000, expectedExitCode: 0 },
+    reproductionOracle: { command: "node", args: ["test.js"], timeoutMs: 10_000, expectedExitCode: 3 },
+    solutionOracle: { command: "node", args: ["test.js"], timeoutMs: 10_000, expectedExitCode: 0 },
     tags: ["typescript", "deterministic-test"],
     createdAt: now,
     updatedAt: now,
@@ -173,7 +173,11 @@ describe("Experience to production Skill lifecycle", () => {
       repositoryDirectory: fixture.directory,
     }));
     const report = new SkillValidationAgent(skills, new RepairFixtureExecutor()).validate(generated.skill.skillId, targets);
-    expect(report).toMatchObject({ verdict: "pass", holdoutSuccessRate: 1, totalTokenUsage: 240, totalToolCalls: 24 });
+    expect(
+      report.verdict,
+      `${report.reason}\n${JSON.stringify(report.caseResults, null, 2)}`,
+    ).toBe("pass");
+    expect(report).toMatchObject({ holdoutSuccessRate: 1, totalTokenUsage: 240, totalToolCalls: 24 });
     expect(report.caseResults.every((result) => result.passed === 3 && result.stable)).toBe(true);
     expect(report.caseResults.every((result) => result.evidenceEventIds.length === 3)).toBe(true);
     expect(skills.listProduction()).toEqual([]);

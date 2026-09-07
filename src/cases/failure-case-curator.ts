@@ -145,10 +145,12 @@ function oracleFromGrader(event: EventEnvelope): CaseOracle | undefined {
   const exitCode = event.payload.exitCode;
   if (!command || typeof exitCode !== "number") return undefined;
 
-  if (
-    command === process.execPath &&
-    args[0]?.replaceAll("\\", "/").endsWith("/npm/bin/npm-cli.js")
-  ) {
+  const normalizedCommand = command.replaceAll("\\", "/");
+  const isNode =
+    command === process.execPath ||
+    normalizedCommand.endsWith("/bin/node") ||
+    normalizedCommand.endsWith("/node.exe");
+  if (isNode && args[0]?.replaceAll("\\", "/").endsWith("/npm/bin/npm-cli.js")) {
     return {
       command: "npm",
       args: args.slice(1),
@@ -156,7 +158,12 @@ function oracleFromGrader(event: EventEnvelope): CaseOracle | undefined {
       expectedExitCode: exitCode,
     };
   }
-  return { command, args, timeoutMs: 120_000, expectedExitCode: exitCode };
+  return {
+    command: isNode ? "node" : command,
+    args,
+    timeoutMs: 120_000,
+    expectedExitCode: exitCode,
+  };
 }
 
 function git(repository: string, args: string[]): string {

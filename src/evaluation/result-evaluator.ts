@@ -117,8 +117,7 @@ export class ResultEvaluator {
       source: { adapter: "harness-core", adapterVersion: "0.1.0" },
       policyVersion: "default-1",
       payload: {
-        command: command.command,
-        args: command.args,
+        ...portableInvocation(command.command, command.args),
         required: command.required,
         exitCode: child.status,
         timedOut,
@@ -146,6 +145,14 @@ export class ResultEvaluator {
 export function summarizeOutput(output: string): string {
   const limit = 32_000;
   return output.length <= limit ? output : `${output.slice(0, limit)}\n<TRUNCATED>`;
+}
+
+function portableInvocation(command: string, args: string[]): { command: string; args: string[] } {
+  if (command !== process.execPath) return { command, args };
+  if (args[0]?.replaceAll("\\", "/").endsWith("/npm/bin/npm-cli.js")) {
+    return { command: "npm", args: args.slice(1) };
+  }
+  return { command: "node", args };
 }
 
 export function sanitizedEnvironment(): NodeJS.ProcessEnv {
