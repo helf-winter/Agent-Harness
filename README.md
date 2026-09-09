@@ -80,7 +80,27 @@ nano ~/.config/agent-harness/claude-providers.env
 ```
 
 填入 `ARK_API_KEY` 和 `DEEPSEEK_API_KEY` 后，普通 `claude` 默认使用方舟
-`glm-5.3-flash`。也可用以下任一命令显式选择供应商和模型：
+`glm-5.3-flash`。推荐使用以下短命令显式选择供应商和模型：
+
+```bash
+npm run glm
+npm run kimi
+npm run ds
+npm run dsp
+```
+
+对应关系为：`glm` 使用方舟 `glm-5.3-flash`，`kimi` 使用方舟
+`kimi-k2.7-code`，`ds` 使用 DeepSeek `deepseek-v4-flash`，`dsp` 使用
+DeepSeek `deepseek-v4-pro`。
+
+如果想在任意目录直接输入 `kimi`、`glm`、`ds`、`dsp`，可以安装本机 Bash
+快捷命令：
+
+```bash
+bash scripts/install-claude-shortcuts.sh
+```
+
+原来的完整命令仍然保留：
 
 ```bash
 npm run claude:ark:glm
