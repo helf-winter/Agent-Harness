@@ -102,4 +102,61 @@ describe("Harness MCP service", () => {
     expect(restored.traceId).toBe(original.traceId);
     service.close();
   });
+
+  it("records recursive TaskNodes for the focused Trace and suggests DFS or BFS traversal", () => {
+    const directory = mkdtempSync(join(tmpdir(), "agent-harness-service-"));
+    temporaryDirectories.push(directory);
+    const databasePath = join(directory, "harness.sqlite");
+    const processor = new HookProcessor(databasePath, {
+      runtimeInstanceId: "runtime-service",
+      projectId: "project-one",
+      adapterVersion: "2.1.220",
+    });
+    processor.process(input("SessionStart", { source: "startup" }));
+    processor.process(input("UserPromptSubmit", { prompt: "Build a knowledge base" }));
+    processor.close();
+
+    const service = new HarnessService(databasePath, "runtime-service");
+    const root = service.createTaskNodeRoot({
+      nodeId: "node-root",
+      title: "Build a knowledge base",
+      description: "Top-level recursive task node.",
+    });
+    expect(root.root?.nodeId).toBe("node-root");
+
+    const decomposed = service.decomposeTaskNode("node-root", [
+      {
+        nodeId: "node-rag",
+        title: "Implement RAG",
+        description: "Implement retrieval augmented generation.",
+      },
+      {
+        nodeId: "node-ui",
+        title: "Implement UI",
+        description: "Implement the user interface.",
+      },
+    ]);
+    expect(decomposed.nodes.map((node) => node.nodeId)).toEqual(["node-root", "node-rag", "node-ui"]);
+
+    service.decomposeTaskNode("node-rag", [
+      {
+        nodeId: "node-vector-search",
+        title: "Implement vector search",
+        description: "Add the smallest executable vector search task.",
+        isAtomic: true,
+      },
+    ]);
+
+    expect(service.selectNextTaskNode("dfs", "Prefer drilling into the current branch.")?.nodeId).toBe(
+      "node-vector-search",
+    );
+    expect(service.selectNextTaskNode("bfs", "Prefer the shallowest sibling first.")?.nodeId).toBe("node-ui");
+
+    const completed = service.completeTaskNode("node-vector-search", "Vector search task completed.");
+    expect(completed.nodes.find((node) => node.nodeId === "node-vector-search")).toMatchObject({
+      status: "completed",
+      resultSummary: "Vector search task completed.",
+    });
+    service.close();
+  });
 });

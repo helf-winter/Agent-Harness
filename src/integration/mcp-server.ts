@@ -3,6 +3,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import { STAGES } from "../domain/lifecycle.js";
+import type { TraversalStrategy } from "../task-tree/types.js";
 import { HarnessService } from "./harness-service.js";
 import { harnessDatabasePath } from "./paths.js";
 
@@ -13,6 +14,13 @@ if (!runtimeInstanceId) {
 
 const service = new HarnessService(harnessDatabasePath(), runtimeInstanceId);
 const server = new McpServer({ name: "agent-harness", version: "0.1.0" });
+const taskNodeInputSchema = z.object({
+  nodeId: z.string().min(1).optional(),
+  title: z.string().min(1).max(200),
+  description: z.string().min(1),
+  isAtomic: z.boolean().default(false),
+});
+const traversalStrategySchema = z.enum(["dfs", "bfs"]);
 
 server.registerTool(
   "harness_get_context",
@@ -90,6 +98,104 @@ server.registerTool(
 );
 
 server.registerTool(
+  "harness_get_task_tree",
+  {
+    description:
+      "Read the recursive TaskNode tree for the focused Trace, including deterministic DFS and BFS next-node suggestions.",
+    inputSchema: {},
+  },
+  async () => textResult(service.getTaskTree()),
+);
+
+server.registerTool(
+  "harness_create_task_node_root",
+  {
+    description:
+      "Create the root TaskNode for the focused Trace when the Task needs recursive decomposition tracking.",
+    inputSchema: taskNodeInputSchema.shape,
+  },
+  async (input) => textResult(service.createTaskNodeRoot(normalizeTaskNodeInput(input))),
+);
+
+server.registerTool(
+  "harness_decompose_task_node",
+  {
+    description:
+      "Record that a TaskNode is too large to execute directly and has been decomposed into child TaskNodes.",
+    inputSchema: {
+      nodeId: z.string().min(1),
+      children: z.array(taskNodeInputSchema).min(1).max(12),
+    },
+  },
+  async ({ nodeId, children }) =>
+    textResult(service.decomposeTaskNode(nodeId, children.map(normalizeTaskNodeInput))),
+);
+
+server.registerTool(
+  "harness_select_next_task_node",
+  {
+    description:
+      "Select and mark the next executable TaskNode according to DFS or BFS traversal for the focused Trace.",
+    inputSchema: {
+      strategy: traversalStrategySchema,
+      reason: z.string().min(1),
+    },
+  },
+  async ({ strategy, reason }) =>
+    textResult(service.selectNextTaskNode(strategy as TraversalStrategy, reason)),
+);
+
+server.registerTool(
+  "harness_start_task_node",
+  {
+    description: "Mark a focused-Trace TaskNode as running before working on that recursive subgoal.",
+    inputSchema: {
+      nodeId: z.string().min(1),
+      reason: z.string().min(1),
+    },
+  },
+  async ({ nodeId, reason }) => textResult(service.startTaskNode(nodeId, reason)),
+);
+
+server.registerTool(
+  "harness_complete_task_node",
+  {
+    description: "Mark a focused-Trace TaskNode as completed with a concrete result summary.",
+    inputSchema: {
+      nodeId: z.string().min(1),
+      resultSummary: z.string().min(1),
+    },
+  },
+  async ({ nodeId, resultSummary }) =>
+    textResult(service.completeTaskNode(nodeId, resultSummary)),
+);
+
+server.registerTool(
+  "harness_fail_task_node",
+  {
+    description: "Mark a focused-Trace TaskNode as failed with the observed reason or result.",
+    inputSchema: {
+      nodeId: z.string().min(1),
+      resultSummary: z.string().min(1),
+    },
+  },
+  async ({ nodeId, resultSummary }) => textResult(service.failTaskNode(nodeId, resultSummary)),
+);
+
+server.registerTool(
+  "harness_prune_task_node",
+  {
+    description:
+      "Mark a focused-Trace TaskNode as pruned when it is duplicate, unnecessary, blocked by policy, or no longer relevant.",
+    inputSchema: {
+      nodeId: z.string().min(1),
+      resultSummary: z.string().min(1),
+    },
+  },
+  async ({ nodeId, resultSummary }) => textResult(service.pruneTaskNode(nodeId, resultSummary)),
+);
+
+server.registerTool(
   "harness_recall",
   {
     description:
@@ -152,5 +258,19 @@ await server.connect(new StdioServerTransport());
 function textResult(value: unknown) {
   return {
     content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }],
+  };
+}
+
+function normalizeTaskNodeInput(input: {
+  nodeId?: string | undefined;
+  title: string;
+  description: string;
+  isAtomic: boolean;
+}) {
+  return {
+    ...(input.nodeId ? { nodeId: input.nodeId } : {}),
+    title: input.title,
+    description: input.description,
+    isAtomic: input.isAtomic,
   };
 }
