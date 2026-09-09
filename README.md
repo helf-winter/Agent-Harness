@@ -8,6 +8,7 @@
 
 - Session、Task、Trace、Turn、Stage、Step 和 Attempt 的标识约束。
 - Turn 与 Task 多对多关联的架构定义。
+- Task 内递归 TaskNode 树、DFS/BFS 遍历选择和 CLI 查询。
 - 确定性研发阶段状态机。
 - 写入前字段及内联凭据脱敏。
 - SQLite WAL 追加事件账本。
@@ -54,6 +55,8 @@ npm test
 npm run build
 npm run dev -- run
 npm run dev -- trace list
+npm run dev -- task tree <task-id|trace-id>
+npm run dev -- task node <node-id>
 npm run dev -- case list
 npm run dev -- case curate <trace-id>
 npm run dev -- case reproduce <case-id>

@@ -9,6 +9,7 @@
 - 一个 Session 可以包含多个交叉进行的 Task。
 - Turn 属于 Session，通过 `turn_task_links` 与 Task 建立多对多关系。
 - Task 表示稳定目标；Trace 表示该目标的一次独立执行。
+- Trace 内可记录递归 TaskNode 树；DFS/BFS 决定子任务遍历顺序，不改变 Task 的稳定目标语义。
 - `/resume` 和崩溃恢复继续原 Trace；从头重跑、基线对照或更换初始环境创建新 Trace。
 - Case、Experience 和 Skill 存入全局 Registry，但召回仍受适用范围、技术栈和安全策略过滤。
 - 首个纵向场景是 TypeScript 项目中的可复现测试失败修复。
@@ -56,7 +57,7 @@ runtimeInstanceId
                         `-- toolCallId
 ```
 
-Turn 不直接置于 Task 层级下。`turn_task_links` 保存一个主 Task 和零到多个关联 Task。Step 和 Attempt 必须有唯一主 Task；跨任务影响通过 `relatedTaskIds` 表达。
+Turn 不直接置于 Task 层级下。`turn_task_links` 保存一个主 Task 和零到多个关联 Task。Step 和 Attempt 必须有唯一主 Task；跨任务影响通过 `relatedTaskIds` 表达。递归子任务不创建新的 Task，使用 Trace 内的 TaskNode 树表示；TaskNode 可以通过 DFS 或 BFS 策略选择下一个可执行节点。
 
 ## 4. 事件和投影
 

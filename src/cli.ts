@@ -18,6 +18,7 @@ import { SkillGenerator } from "./skills/skill-generator.js";
 import { SkillRegistry } from "./skills/skill-registry.js";
 import type { SkillStatus } from "./skills/types.js";
 import { EventLedger } from "./storage/event-ledger.js";
+import { selectNextTaskNode } from "./task-tree/traversal.js";
 import { ClaudeCodeSkillExecutor } from "./validation/claude-code-skill-executor.js";
 import { SkillLifecycleController, SkillValidationAgent } from "./validation/skill-validation-agent.js";
 
@@ -231,6 +232,58 @@ function showTrace(traceId: string | undefined): number {
   const chain = ledger.verifyChain();
   ledger.close();
   console.log(JSON.stringify({ trace, chain, events }, null, 2));
+  return 0;
+}
+
+function showTaskTree(identifier: string | undefined): number {
+  if (!identifier) {
+    console.error("Usage: harness task tree <task-id|trace-id>");
+    return 1;
+  }
+  const databasePath = harnessDatabasePath();
+  if (!existsSync(databasePath)) {
+    console.error("Harness database does not exist.");
+    return 1;
+  }
+  const ledger = new EventLedger(databasePath);
+  const projection = new ProjectionStore(databasePath);
+  projection.projectPending(ledger);
+  const trace = projection.getTrace(identifier);
+  const scope = trace ? { traceId: identifier } : { taskId: identifier };
+  const tree = projection.getTaskTree(scope);
+  projection.close();
+  ledger.close();
+  console.log(JSON.stringify({
+    ...tree,
+    next: {
+      dfs: selectNextTaskNode(tree.nodes, "dfs"),
+      bfs: selectNextTaskNode(tree.nodes, "bfs"),
+    },
+  }, null, 2));
+  return 0;
+}
+
+function showTaskNode(nodeId: string | undefined): number {
+  if (!nodeId) {
+    console.error("Usage: harness task node <node-id>");
+    return 1;
+  }
+  const databasePath = harnessDatabasePath();
+  if (!existsSync(databasePath)) {
+    console.error("Harness database does not exist.");
+    return 1;
+  }
+  const ledger = new EventLedger(databasePath);
+  const projection = new ProjectionStore(databasePath);
+  projection.projectPending(ledger);
+  const node = projection.getTaskNode(nodeId);
+  projection.close();
+  ledger.close();
+  if (!node) {
+    console.error(`TaskNode not found: ${nodeId}`);
+    return 1;
+  }
+  console.log(JSON.stringify(node, null, 2));
   return 0;
 }
 
@@ -493,6 +546,8 @@ Usage:
   harness run [claude arguments...]
   harness trace list
   harness trace show <trace-id>
+  harness task tree <task-id|trace-id>
+  harness task node <node-id>
   harness case list [status]
   harness case show <case-id>
   harness case curate <trace-id>
@@ -518,6 +573,14 @@ switch (command) {
     break;
   case "trace":
     process.exitCode = subcommand === "list" ? listTraces() : showTrace(argument);
+    break;
+  case "task":
+    process.exitCode =
+      subcommand === "tree"
+        ? showTaskTree(argument)
+        : subcommand === "node"
+          ? showTaskNode(argument)
+          : (help(), 1);
     break;
   case "case":
     process.exitCode =
