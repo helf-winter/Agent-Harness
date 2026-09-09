@@ -26,6 +26,25 @@ EOF
   chmod 700 "$target"
 }
 
+install_menu_shortcut() {
+  local target="$bin_dir/cc"
+
+  if [[ -e "$target" ]] && ! grep -q 'agent-harness claude provider shortcut' "$target" 2>/dev/null; then
+    printf 'Refusing to overwrite existing file: %s\n' "$target" >&2
+    exit 1
+  fi
+
+  cat > "$target" <<EOF
+#!/usr/bin/env bash
+# agent-harness claude provider shortcut
+set -euo pipefail
+cd "$repo_root"
+exec bash scripts/claude-provider-menu.sh "\$@"
+EOF
+  chmod 700 "$target"
+}
+
+install_menu_shortcut
 install_shortcut glm ark-glm
 install_shortcut kimi ark-kimi
 install_shortcut ds deepseek-flash
@@ -41,4 +60,4 @@ case ":$PATH:" in
     ;;
 esac
 
-printf 'Installed Claude provider shortcuts: glm, kimi, ds, dsp\n'
+printf 'Installed Claude provider shortcuts: cc, glm, kimi, ds, dsp\n'
