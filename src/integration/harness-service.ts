@@ -269,7 +269,7 @@ export class HarnessService {
 
   decomposeTaskNode(nodeId: string, children: TaskNodeInput[]): TaskTreeProjection {
     const context = this.getContext();
-    this.#assertFocusedNode(nodeId, context.traceId);
+    this.#assertMutableFocusedNode(nodeId, context.traceId);
     this.#taskTreeService(context).decompose(nodeId, children);
     this.#projection.projectPending(this.#ledger);
     return this.#projection.getTaskTree({ traceId: context.traceId });
@@ -289,7 +289,7 @@ export class HarnessService {
   startTaskNode(nodeId: string, reason: string): TaskTreeProjection {
     if (!reason.trim()) throw new Error("A start reason is required.");
     const context = this.getContext();
-    this.#assertFocusedNode(nodeId, context.traceId);
+    this.#assertMutableFocusedNode(nodeId, context.traceId);
     this.#taskTreeService(context).start(nodeId, reason);
     this.#projection.projectPending(this.#ledger);
     return this.#projection.getTaskTree({ traceId: context.traceId });
@@ -298,7 +298,7 @@ export class HarnessService {
   completeTaskNode(nodeId: string, resultSummary: string): TaskTreeProjection {
     if (!resultSummary.trim()) throw new Error("A result summary is required.");
     const context = this.getContext();
-    this.#assertFocusedNode(nodeId, context.traceId);
+    this.#assertMutableFocusedNode(nodeId, context.traceId);
     this.#taskTreeService(context).complete(nodeId, resultSummary);
     this.#projection.projectPending(this.#ledger);
     return this.#projection.getTaskTree({ traceId: context.traceId });
@@ -307,7 +307,7 @@ export class HarnessService {
   failTaskNode(nodeId: string, resultSummary: string): TaskTreeProjection {
     if (!resultSummary.trim()) throw new Error("A result summary is required.");
     const context = this.getContext();
-    this.#assertFocusedNode(nodeId, context.traceId);
+    this.#assertMutableFocusedNode(nodeId, context.traceId);
     this.#taskTreeService(context).fail(nodeId, resultSummary);
     this.#projection.projectPending(this.#ledger);
     return this.#projection.getTaskTree({ traceId: context.traceId });
@@ -316,7 +316,7 @@ export class HarnessService {
   pruneTaskNode(nodeId: string, resultSummary: string): TaskTreeProjection {
     if (!resultSummary.trim()) throw new Error("A result summary is required.");
     const context = this.getContext();
-    this.#assertFocusedNode(nodeId, context.traceId);
+    this.#assertMutableFocusedNode(nodeId, context.traceId);
     this.#taskTreeService(context).prune(nodeId, resultSummary);
     this.#projection.projectPending(this.#ledger);
     return this.#projection.getTaskTree({ traceId: context.traceId });
@@ -343,10 +343,14 @@ export class HarnessService {
     });
   }
 
-  #assertFocusedNode(nodeId: string, traceId: string): void {
+  #assertMutableFocusedNode(nodeId: string, traceId: string): TaskNodeProjection {
     const node = this.#projection.getTaskNode(nodeId);
     if (!node) throw new Error(`TaskNode not found: ${nodeId}`);
     if (node.traceId !== traceId) throw new Error("TaskNode belongs to a different Trace scope.");
+    if (node.status === "completed" || node.status === "pruned") {
+      throw new Error(`Cannot mutate terminal TaskNode: ${nodeId}`);
+    }
+    return node;
   }
 
   evaluateProject(projectDirectory: string): EvaluationReport {

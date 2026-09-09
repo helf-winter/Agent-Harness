@@ -161,4 +161,31 @@ describe("Harness MCP service", () => {
     });
     service.close();
   });
+
+  it("rejects mutating a terminal TaskNode through the service boundary", () => {
+    const directory = mkdtempSync(join(tmpdir(), "agent-harness-service-"));
+    temporaryDirectories.push(directory);
+    const databasePath = join(directory, "harness.sqlite");
+    const processor = new HookProcessor(databasePath, {
+      runtimeInstanceId: "runtime-service",
+      projectId: "project-one",
+      adapterVersion: "2.1.220",
+    });
+    processor.process(input("UserPromptSubmit", { prompt: "Fix one deterministic failure" }));
+    processor.close();
+
+    const service = new HarnessService(databasePath, "runtime-service");
+    const root = service.getTaskTree().root!;
+    service.completeTaskNode(root.nodeId, "The root task completed.");
+
+    expect(() =>
+      service.decomposeTaskNode(root.nodeId, [
+        { title: "Unexpected child", description: "This would mutate a terminal node." },
+      ]),
+    ).toThrow("terminal TaskNode");
+    expect(() => service.startTaskNode(root.nodeId, "Restart completed work.")).toThrow("terminal TaskNode");
+    expect(() => service.failTaskNode(root.nodeId, "Overwrite completion.")).toThrow("terminal TaskNode");
+    expect(() => service.pruneTaskNode(root.nodeId, "Overwrite completion.")).toThrow("terminal TaskNode");
+    service.close();
+  });
 });
