@@ -98,6 +98,12 @@ describe("Claude Code Hook processor", () => {
       taskTitle: "Fix the failing login test",
       currentStage: "INTAKE",
     });
+    expect(projection.getTaskTree({ traceId: firstTurn.traceId! }).root).toMatchObject({
+      title: "Fix the failing login test",
+      parentNodeId: null,
+      depth: 0,
+      status: "pending",
+    });
     expect(projection.findSession(firstTurn.sessionId)?.status).toBe("ended");
     projection.close();
   });

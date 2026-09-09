@@ -169,7 +169,19 @@ export class HookProcessor {
         policyVersion: "default-1",
       });
       controller.startTrace({ sessionId, taskId, traceId }, "First execution of the task");
-      appendedEvents += 2;
+      this.#append({
+        eventType: EVENT_TYPES.TASK_NODE_CREATED,
+        sessionId,
+        taskId,
+        traceId,
+        correlationId: traceId,
+        payload: {
+          nodeId: stableChildId("task_node", traceId),
+          title: promptPreview(prompt) || "Untitled Claude Code task",
+          description: "Root recursive TaskNode automatically created for the Trace.",
+        },
+      });
+      appendedEvents += 3;
       this.#projection.projectPending(this.#ledger);
       task = this.#projection.getFocusedTask(sessionId) ?? {
         taskId,

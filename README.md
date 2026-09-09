@@ -9,6 +9,7 @@
 - Session、Task、Trace、Turn、Stage、Step 和 Attempt 的标识约束。
 - Turn 与 Task 多对多关联的架构定义。
 - Task 内递归 TaskNode 树、DFS/BFS 遍历选择和 CLI 查询。
+- 新 Trace 自动初始化根 TaskNode，复杂任务可直接从根节点继续递归分解。
 - 确定性研发阶段状态机。
 - 写入前字段及内联凭据脱敏。
 - SQLite WAL 追加事件账本。

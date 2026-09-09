@@ -130,6 +130,18 @@ export class HarnessService {
       { sessionId: current.sessionId, taskId, traceId },
       "First execution of a newly classified Task",
     );
+    new TaskTreeService(this.#ledger, {
+      runtimeInstanceId: this.runtimeInstanceId,
+      sessionId: current.sessionId,
+      taskId,
+      traceId,
+      actor: { type: "agent", id: "claude-code" },
+      source: { adapter: "harness-mcp", adapterVersion: "0.1.0" },
+      policyVersion: "default-1",
+    }).createRoot({
+      title,
+      description: "Root recursive TaskNode automatically created for the Trace.",
+    });
     this.#ledger.append({
       eventType: EVENT_TYPES.TURN_LINKED_TO_TASK,
       runtimeInstanceId: this.runtimeInstanceId,

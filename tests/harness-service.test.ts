@@ -94,6 +94,11 @@ describe("Harness MCP service", () => {
       "The prompt introduces an independent goal.",
     );
     expect(created.taskId).not.toBe(original.taskId);
+    expect(service.getTaskTree().root).toMatchObject({
+      title: "Fix the build configuration",
+      parentNodeId: null,
+      depth: 0,
+    });
     expect(service.listTasks()).toHaveLength(2);
     expect(service.listTasks().find((task) => task.taskId === created.taskId)?.focused).toBe(true);
 
@@ -117,14 +122,11 @@ describe("Harness MCP service", () => {
     processor.close();
 
     const service = new HarnessService(databasePath, "runtime-service");
-    const root = service.createTaskNodeRoot({
-      nodeId: "node-root",
-      title: "Build a knowledge base",
-      description: "Top-level recursive task node.",
-    });
-    expect(root.root?.nodeId).toBe("node-root");
+    const root = service.getTaskTree();
+    expect(root.root).toMatchObject({ title: "Build a knowledge base" });
+    const rootNodeId = root.root!.nodeId;
 
-    const decomposed = service.decomposeTaskNode("node-root", [
+    const decomposed = service.decomposeTaskNode(rootNodeId, [
       {
         nodeId: "node-rag",
         title: "Implement RAG",
@@ -136,7 +138,7 @@ describe("Harness MCP service", () => {
         description: "Implement the user interface.",
       },
     ]);
-    expect(decomposed.nodes.map((node) => node.nodeId)).toEqual(["node-root", "node-rag", "node-ui"]);
+    expect(decomposed.nodes.map((node) => node.nodeId)).toEqual([rootNodeId, "node-rag", "node-ui"]);
 
     service.decomposeTaskNode("node-rag", [
       {
