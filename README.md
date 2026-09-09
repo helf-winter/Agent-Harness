@@ -28,6 +28,7 @@
 - `raw → triaged → reproducible → approved → active` 自动晋升状态机。
 - 复现记录与生命周期变更均写入不可变事件账本。
 - 成功 Trace 的 Experience 提取、去重、证据关联和三态生命周期。
+- 成功 Trace 中的递归 TaskNode 路径可沉淀进 Experience，并继续进入 Skill 策略。
 - 版本化 Skill Schema、Claude Skill Markdown 投影和最小权限声明。
 - `testing → completed → quarantined/deprecated` 生产过滤状态机。
 - development、validation、regression、holdout 四类 Case 的独立验证。

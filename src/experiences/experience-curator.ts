@@ -4,6 +4,7 @@ import type { EventEnvelope } from "../domain/events.js";
 import type { ProjectionStore } from "../projections/projection-store.js";
 import { canonicalJson } from "../storage/canonical-json.js";
 import type { EventLedger } from "../storage/event-ledger.js";
+import type { TaskNodeProjection } from "../task-tree/types.js";
 import type { ExperienceStore } from "./experience-store.js";
 import { EXPERIENCE_SCHEMA_VERSION, type Experience } from "./types.js";
 
@@ -39,10 +40,13 @@ export class ExperienceCurator {
     const graderIds = Array.isArray(result.payload.commandEvidenceEventIds)
       ? result.payload.commandEvidenceEventIds.filter((value): value is string => typeof value === "string")
       : [];
-    const evidenceEventIds = [...new Set([...observationsEvidence(events), ...graderIds, result.eventId])];
-    const strategy = observations.length > 0
+    const taskTree = this.projection.getTaskTree({ traceId });
+    const taskTreeSummary = taskTreeStrategy(taskTree.nodes);
+    const evidenceEventIds = [...new Set([...observationsEvidence(events), ...taskNodeEvidence(events), ...graderIds, result.eventId])];
+    const baseStrategy = observations.length > 0
       ? observations.join(" Then: ")
       : "Reproduce the failing test, make the smallest TypeScript change, then run typecheck, build, and tests before completion.";
+    const strategy = taskTreeSummary ? `${baseStrategy} Then: ${taskTreeSummary}` : baseStrategy;
     const fingerprint = createHash("sha256")
       .update(canonicalJson({ title: normalize(title), strategy: normalize(strategy), taskType: "typescript-reproducible-test-repair" }))
       .digest("hex");
@@ -88,6 +92,37 @@ export class ExperienceCurator {
 
 function observationsEvidence(events: EventEnvelope[]): string[] {
   return events.filter((event) => event.eventType === "observation.recorded").map((event) => event.eventId);
+}
+
+function taskNodeEvidence(events: EventEnvelope[]): string[] {
+  return events
+    .filter((event) => event.eventType.startsWith("task_node."))
+    .map((event) => event.eventId);
+}
+
+function taskTreeStrategy(nodes: TaskNodeProjection[]): string {
+  if (nodes.length === 0) return "";
+  const byId = new Map(nodes.map((node) => [node.nodeId, node]));
+  const completedLeaves = nodes
+    .filter((node) => node.status === "completed")
+    .filter((node) => !nodes.some((candidate) => candidate.parentNodeId === node.nodeId))
+    .sort((left, right) => {
+      if (left.depth !== right.depth) return right.depth - left.depth;
+      if (left.childIndex !== right.childIndex) return left.childIndex - right.childIndex;
+      return left.createdAt.localeCompare(right.createdAt);
+    });
+  if (completedLeaves.length === 0) return "";
+
+  const paths = completedLeaves.slice(0, 3).map((leaf) => {
+    const path: string[] = [];
+    let cursor: TaskNodeProjection | undefined = leaf;
+    while (cursor) {
+      path.unshift(cursor.title);
+      cursor = cursor.parentNodeId ? byId.get(cursor.parentNodeId) : undefined;
+    }
+    return path.join(" -> ");
+  });
+  return `Recursive TaskNode path: ${paths.join("; ")}`;
 }
 
 function normalize(value: string): string {

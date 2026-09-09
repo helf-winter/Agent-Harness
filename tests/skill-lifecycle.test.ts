@@ -67,6 +67,43 @@ function successfulTrace(ledger: EventLedger, projection: ProjectionStore): void
     payload: { summary: "Trace the assertion to the narrow arithmetic implementation and preserve the public contract." },
   }));
   ledger.append(event({
+    eventId: "evt-task-node-root",
+    eventType: EVENT_TYPES.TASK_NODE_CREATED,
+    taskId: "task-skill-test",
+    traceId: "trace-skill-test",
+    payload: {
+      nodeId: "node-root",
+      title: "Repair arithmetic regression",
+      description: "Top-level repair task.",
+    },
+  }));
+  ledger.append(event({
+    eventId: "evt-task-node-root-decomposed",
+    eventType: EVENT_TYPES.TASK_NODE_DECOMPOSED,
+    taskId: "task-skill-test",
+    traceId: "trace-skill-test",
+    payload: {
+      nodeId: "node-root",
+      children: [
+        {
+          nodeId: "node-diagnose",
+          title: "Diagnose arithmetic failure",
+          description: "Trace the failure to the implementation.",
+        },
+      ],
+    },
+  }));
+  ledger.append(event({
+    eventId: "evt-task-node-diagnose-completed",
+    eventType: EVENT_TYPES.TASK_NODE_COMPLETED,
+    taskId: "task-skill-test",
+    traceId: "trace-skill-test",
+    payload: {
+      nodeId: "node-diagnose",
+      resultSummary: "Arithmetic implementation was isolated.",
+    },
+  }));
+  ledger.append(event({
     eventId: "evt-skill-grader",
     eventType: "grader.completed",
     taskId: "task-skill-test",
@@ -156,6 +193,10 @@ describe("Experience to production Skill lifecycle", () => {
     const experiences = new ExperienceStore(databasePath, ledger);
     const curation = new ExperienceCurator(ledger, projection, experiences).curate("trace-skill-test");
     expect(curation).toMatchObject({ accepted: true, created: true, experience: { status: "usable" } });
+    expect(curation.experience?.strategy).toContain(
+      "Recursive TaskNode path: Repair arithmetic regression -> Diagnose arithmetic failure",
+    );
+    expect(curation.experience?.source.evidenceEventIds).toContain("evt-task-node-diagnose-completed");
 
     const skills = new SkillRegistry(databasePath, ledger);
     const generated = new SkillGenerator(experiences, skills).generate([curation.experience!.experienceId]);
