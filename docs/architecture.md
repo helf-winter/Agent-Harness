@@ -20,10 +20,7 @@
 ## 2. 系统边界
 
 ```text
-Claude Code
-  |-- plugin hooks: 采集和关键工具门禁
-  |-- harness MCP: 阶段转换、召回、结果提交
-  `-- completed skill projection
+User / CLI shortcuts
              |
              v
 Harness Core
@@ -31,7 +28,14 @@ Harness Core
   |-- Event Ledger / Trace Projector
   |-- Result Evaluator / Policy Engine
   |-- Global Registries and Recall
+  |-- TaskNode recursive traversal
   `-- Artifact Store
+             |
+             v
+Claude Code
+  |-- plugin hooks: 采集和关键工具门禁
+  |-- harness MCP: 阶段转换、TaskNode、召回、结果提交
+  `-- completed skill projection
              |
              v
 Workers
@@ -40,7 +44,7 @@ Workers
   `-- Validation Runner / Deterministic Graders
 ```
 
-Harness 不重写 Claude Code Agent Loop。普通模型和工具选择仍由 Claude Code 完成；Harness 只控制阶段状态、完成条件、危险工具边界和 Skill 生命周期。
+Harness 是用户入口和管理层，负责启动 Claude Code managed mode。Harness 不重写 Claude Code Agent Loop；普通模型推理和工具选择仍由 Claude Code 完成，Harness 负责阶段状态、完成条件、危险工具边界、TaskNode 递归遍历建议和 Skill 生命周期。
 
 ## 3. 标识与关联
 

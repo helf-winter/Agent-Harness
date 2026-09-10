@@ -121,7 +121,9 @@ DeepSeek `deepseek-v4-pro`。
 bash scripts/install-claude-shortcuts.sh
 ```
 
-安装后推荐只记一个命令：
+安装后推荐只记一个命令。`cc`、`glm`、`kimi`、`ds` 和 `dsp` 都是 Harness-first
+入口：先进入 Agent Harness managed mode，再由 Harness 启动 Claude Code 并挂载 Hook、MCP
+和 managed prompt。
 
 ```bash
 cc

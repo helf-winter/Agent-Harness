@@ -3,7 +3,7 @@ set -euo pipefail
 
 usage() {
   cat >&2 <<'EOF'
-Usage: scripts/claude-provider.sh <profile> [claude arguments...]
+Usage: scripts/claude-provider.sh <profile> [harness/claude arguments...]
 
 Profiles:
   ark-glm          Volcano Ark / glm-5.3-flash
@@ -94,5 +94,14 @@ export ANTHROPIC_DEFAULT_OPUS_MODEL="$model"
 export ANTHROPIC_DEFAULT_SONNET_MODEL="$model"
 export ANTHROPIC_DEFAULT_HAIKU_MODEL="$model"
 
-printf 'Starting Claude Code with %s (%s).\n' "$provider_name" "$model" >&2
-exec claude --model "$model" "$@"
+printf 'Starting Agent Harness with %s (%s).\n' "$provider_name" "$model" >&2
+if [[ "${AGENT_HARNESS_DRY_RUN:-}" == "1" ]]; then
+  printf 'npm run dev -- run --model %s' "$model"
+  for arg in "$@"; do
+    printf ' %q' "$arg"
+  done
+  printf '\n'
+  exit 0
+fi
+
+exec npm run dev -- run --model "$model" "$@"
