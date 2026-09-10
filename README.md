@@ -18,7 +18,8 @@
 - Claude Code、Node、Git 与 Bash 环境诊断。
 - Session、Task、Turn、Trace 的可重放查询投影。
 - Claude Code Session、Prompt、工具和 Stop Hook Adapter。
-- `harness run` 启动入口和 `harness trace` 查询命令。
+- `harness run` / `harness controlled-run` 启动入口和 `harness trace` 查询命令。
+- Harness controlled mode 下的 Hook 工具策略门禁：读工具可在完成前使用，写工具仅在 `EXECUTE` 放行，`Bash` 仅在 `EXECUTE`、`VERIFY`、`REVIEW` 放行。
 - Harness MCP 上下文、Task 创建/切换、Observation 和阶段转换工具。
 - Harness MCP 递归 TaskNode 创建、分解、DFS/BFS 选择和节点状态回写工具。
 - 自动发现 TypeScript 项目的 typecheck、build 和 test 命令。
@@ -56,7 +57,7 @@ npm run demo
 npm run typecheck
 npm test
 npm run build
-npm run dev -- run
+npm run dev -- controlled-run
 npm run dev -- trace list
 npm run dev -- task tree <task-id|trace-id>
 npm run dev -- task node <node-id>
@@ -122,8 +123,9 @@ bash scripts/install-claude-shortcuts.sh
 ```
 
 安装后推荐只记一个命令。`cc`、`glm`、`kimi`、`ds` 和 `dsp` 都是 Harness-first
-入口：先进入 Agent Harness managed mode，再由 Harness 启动 Claude Code 并挂载 Hook、MCP
-和 managed prompt。
+入口：先进入 Agent Harness controlled mode，再由 Harness 启动 Claude Code 并挂载 Hook、MCP
+和 worker prompt。Claude Code 仍负责模型推理和具体代码执行，但工具调用会先经过 Harness
+Hook policy gate；不符合当前生命周期阶段的写入或 Bash 调用会被拒绝。
 
 ```bash
 cc
@@ -164,7 +166,7 @@ export HARNESS_VALIDATION_MODEL=glm-5.3-flash
 
 - Claude Code CLI 执行真实模型任务前必须具备一种有效凭据：Anthropic 登录，或所选兼容供应商的 API Key。使用本项目的供应商启动命令时不需要再执行 `/login`。
 - 独立 Skill 验证刻意不读取用户 Claude 登录或系统钥匙串；真实验证需单独设置仅用于隔离验证的 `HARNESS_VALIDATION_AUTH_TOKEN`。第三方供应商还需设置 `HARNESS_VALIDATION_BASE_URL` 和 `HARNESS_VALIDATION_MODEL`；旧的 `HARNESS_VALIDATION_API_KEY` 仍向后兼容。未设置时 Skill 保持 `testing`。
-- Task 的语义分类由 Claude 通过 Harness MCP 完成，确定性投影和作用域检查由 Harness Core 完成。
-- TaskNode 树已可通过 MCP 记录和查询；当前版本提供 DFS/BFS 下一节点建议，但不强制 Claude Code 调度。
+- Task 的语义分类仍由 Claude 通过 Harness MCP 辅助完成，确定性投影、作用域检查和工具门禁由 Harness Core 完成。
+- TaskNode 树已可通过 MCP 记录和查询；当前版本提供 DFS/BFS 下一节点建议，并通过 lifecycle-aware Hook gate 限制 Claude Code 在错误阶段执行写入或 Bash。
 - 第一阶段验证环境以 Bash 为基准；原生 PowerShell 仅用于本项目开发，不属于正式运行目标。
 - Git worktree 隔离文件状态，但不是完整 OS/网络沙箱；验证器因此只开放读取、编辑和受限的 npm/git Bash 命令。高风险 Skill 会直接验证失败。

@@ -10,6 +10,10 @@ import { ProjectionStore } from "../projections/projection-store.js";
 import { REDACTION_RULES_VERSION } from "../security/redactor.js";
 import { EventLedger } from "../storage/event-ledger.js";
 import {
+  evaluateToolPolicy,
+  type HarnessControlMode,
+} from "./tool-policy.js";
+import {
   harnessDatabasePath,
   stableChildId,
   stableProjectId,
@@ -43,22 +47,38 @@ export interface HookProcessResult {
   turnId?: string;
 }
 
+export class HookPolicyViolation extends Error {
+  readonly exitCode = 2;
+
+  constructor(message: string) {
+    super(message);
+    this.name = "HookPolicyViolation";
+  }
+}
+
 export class HookProcessor {
   readonly #ledger: EventLedger;
   readonly #projection: ProjectionStore;
   readonly #runtimeInstanceId: string;
   readonly #projectId: string;
   readonly #adapterVersion: string;
+  readonly #controlMode: HarnessControlMode;
 
   constructor(
     databasePath: string,
-    options: { runtimeInstanceId: string; projectId: string; adapterVersion: string },
+    options: {
+      runtimeInstanceId: string;
+      projectId: string;
+      adapterVersion: string;
+      controlMode?: HarnessControlMode;
+    },
   ) {
     this.#ledger = new EventLedger(databasePath);
     this.#projection = new ProjectionStore(databasePath);
     this.#runtimeInstanceId = options.runtimeInstanceId;
     this.#projectId = options.projectId;
     this.#adapterVersion = options.adapterVersion;
+    this.#controlMode = options.controlMode ?? "audit";
   }
 
   process(input: ClaudeHookInput): HookProcessResult {
@@ -123,12 +143,24 @@ export class HookProcessor {
       ...(turn ? { turnId: turn.turnId } : {}),
     };
 
-    const mapped = mapHookEvent(input, scope);
+    const policyDecision =
+      input.hook_event_name === "PreToolUse"
+        ? evaluateToolPolicy(
+            input,
+            trace ? { currentStage: trace.currentStage } : {},
+            this.#controlMode,
+          )
+        : undefined;
+    const mapped = mapHookEvent(input, scope, policyDecision);
     if (mapped) {
       this.#ledger.append(mapped);
       appendedEvents += 1;
     }
     this.#projection.projectPending(this.#ledger);
+
+    if (policyDecision && !policyDecision.allowed) {
+      throw new HookPolicyViolation(policyDecision.reason);
+    }
 
     if (input.hook_event_name === "Stop" && trace) {
       scheduleEvolution(trace.traceId, input.cwd);
@@ -248,7 +280,11 @@ function scheduleEvolution(traceId: string, repositoryDirectory: string): void {
   child.unref();
 }
 
-function mapHookEvent(input: ClaudeHookInput, context: EventContext): CapturedEvent | undefined {
+function mapHookEvent(
+  input: ClaudeHookInput,
+  context: EventContext,
+  policyDecision?: ReturnType<typeof evaluateToolPolicy>,
+): CapturedEvent | undefined {
   const common = {
     ...context,
     eventId: createEventId(),
@@ -268,7 +304,11 @@ function mapHookEvent(input: ClaudeHookInput, context: EventContext): CapturedEv
         ...common,
         eventType: "tool.requested",
         ...toolScope(context, toolUseId),
-        payload: { toolName: input.tool_name ?? "unknown", toolInput: input.tool_input ?? {} },
+        payload: {
+          toolName: input.tool_name ?? "unknown",
+          toolInput: input.tool_input ?? {},
+          ...(policyDecision ? { policyDecision } : {}),
+        },
       };
     }
     case "PostToolUse": {
@@ -369,6 +409,7 @@ export function processHookFromEnvironment(input: ClaudeHookInput): HookProcessR
     runtimeInstanceId: process.env.HARNESS_RUNTIME_INSTANCE_ID ?? `runtime_${randomUUID()}`,
     projectId: process.env.HARNESS_PROJECT_ID ?? stableProjectId(input.cwd),
     adapterVersion: process.env.HARNESS_CLAUDE_VERSION ?? "unknown",
+    controlMode: process.env.HARNESS_CONTROL_MODE === "enforce" ? "enforce" : "audit",
   });
   try {
     return processor.process(input);

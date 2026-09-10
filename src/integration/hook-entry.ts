@@ -1,5 +1,10 @@
 #!/usr/bin/env node
-import { recordHookFailure, processHookFromEnvironment, type ClaudeHookInput } from "./hook-processor.js";
+import {
+  HookPolicyViolation,
+  recordHookFailure,
+  processHookFromEnvironment,
+  type ClaudeHookInput,
+} from "./hook-processor.js";
 
 async function readStandardInput(): Promise<string> {
   let input = "";
@@ -12,7 +17,12 @@ try {
   const input = JSON.parse(raw) as ClaudeHookInput;
   processHookFromEnvironment(input);
 } catch (error) {
+  if (error instanceof HookPolicyViolation) {
+    console.error(error.message);
+    process.exitCode = error.exitCode;
+  } else {
   // Observation hooks fail open. Persist only the sanitized error, never the raw Hook payload.
-  recordHookFailure(error);
-  process.exitCode = 0;
+    recordHookFailure(error);
+    process.exitCode = 0;
+  }
 }

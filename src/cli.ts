@@ -172,6 +172,7 @@ function runClaude(args: string[]): number {
       HARNESS_PROJECT_DIR: projectDirectory,
       HARNESS_DB_PATH: harnessDatabasePath(),
       HARNESS_CLAUDE_VERSION: numericVersion(claudeVersion.value).join("."),
+      HARNESS_CONTROL_MODE: "enforce",
     },
     stdio: "inherit",
       shell: false,
@@ -544,6 +545,7 @@ function help(): void {
 Usage:
   harness doctor
   harness run [claude arguments...]
+  harness controlled-run [claude arguments...]
   harness trace list
   harness trace show <trace-id>
   harness task tree <task-id|trace-id>
@@ -569,6 +571,9 @@ switch (command) {
     process.exitCode = doctor();
     break;
   case "run":
+    process.exitCode = runClaude(process.argv.slice(3));
+    break;
+  case "controlled-run":
     process.exitCode = runClaude(process.argv.slice(3));
     break;
   case "trace":

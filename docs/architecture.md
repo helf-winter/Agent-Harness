@@ -26,15 +26,17 @@ User / CLI shortcuts
 Harness Core
   |-- Lifecycle Controller
   |-- Event Ledger / Trace Projector
-  |-- Result Evaluator / Policy Engine
+  |-- Result Evaluator
+  |-- Hook Policy Gate
   |-- Global Registries and Recall
   |-- TaskNode recursive traversal
   `-- Artifact Store
              |
              v
 Claude Code
-  |-- plugin hooks: 采集和关键工具门禁
-  |-- harness MCP: 阶段转换、TaskNode、召回、结果提交
+  |-- worker loop: 模型推理和具体代码执行
+  |-- plugin hooks: 工具调用前门禁、工具结果采集、Stop 采集
+  |-- harness MCP: 请求阶段转换、TaskNode、召回、结果提交
   `-- completed skill projection
              |
              v
@@ -44,7 +46,9 @@ Workers
   `-- Validation Runner / Deterministic Graders
 ```
 
-Harness 是用户入口和管理层，负责启动 Claude Code managed mode。Harness 不重写 Claude Code Agent Loop；普通模型推理和工具选择仍由 Claude Code 完成，Harness 负责阶段状态、完成条件、危险工具边界、TaskNode 递归遍历建议和 Skill 生命周期。
+Harness 是用户入口、管理层和控制面，负责启动 Claude Code controlled mode。Harness 不重写 Claude Code Agent Loop；普通模型推理和具体代码执行仍由 Claude Code 完成，但工具调用必须先经过 Hook Policy Gate。Claude Code 可以提出工具调用和 MCP 请求，Harness 根据当前生命周期阶段、证据范围和完成门禁决定放行、拒绝或推进状态。
+
+当前已实现的硬门禁是 lifecycle-aware `PreToolUse`：读工具在完成前放行，写工具仅在 `EXECUTE` 放行，`Bash` 仅在 `EXECUTE`、`VERIFY`、`REVIEW` 放行，`COMPLETE` 后拒绝继续工具调用。MCP 仍用于 Claude 向 Harness 请求阶段转换和记录 TaskNode，但是否转换成功由 Harness Controller 决定。
 
 ## 3. 标识与关联
 
