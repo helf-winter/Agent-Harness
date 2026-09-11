@@ -83,10 +83,10 @@ harness
 该入口会：
 
 1. 启动或复用 Claude Code Router，也就是 `ccr`；
-2. 将 Claude Code 的 `ANTHROPIC_BASE_URL` 指向 CCR gateway，默认 `http://127.0.0.1:3456`；
-3. 进入 Agent Harness controlled mode；
-4. 由 Harness 启动 Claude Code worker；
-5. 进入 Claude 后使用 `/model` 在 CCR 已配置模型之间切换。
+2. 进入 Agent Harness controlled mode；
+3. 由 Harness 调用 CCR 的 `default-claude-code` profile；
+4. 由 CCR 注入 gateway 地址、profile 身份凭据和模型路由，再启动 Claude Code worker；
+5. 自动加载 Harness 的四模型选择器，进入 Claude 后使用 `/model` 切换。
 
 可选配置文件：
 
@@ -97,23 +97,20 @@ chmod 600 ~/.config/agent-harness/harness-router.env
 nano ~/.config/agent-harness/harness-router.env
 ```
 
-如果 CCR gateway 使用 client API key，在 `AGENT_HARNESS_CCR_AUTH_TOKEN` 填入 CCR UI
-中创建的 client key。上游模型供应商 API Key 不写入本项目配置，应在 CCR UI 中管理。
+通常不需要创建该文件。只有使用了其他 CCR Claude profile，或不希望 Harness 自动启动
+CCR 时才需要修改。上游模型供应商 API Key 继续只在 CCR UI 中管理。
 
-进入 Claude 后用 `/model` 选择 CCR 暴露的模型，例如：
+进入 Claude 后用 `/model` 选择以下四个模型：
 
 ```text
-/model glm/glm-5.3
+/model ark/glm-5.3-flash
+/model ark/kimi-k2.7-code
 /model deepseek/deepseek-v4-flash
 /model deepseek/deepseek-v4-pro
 ```
 
-如果你已经在 CCR 中配置了火山方舟模型，也可以选择你在 CCR 里登记的名字，例如：
-
-```text
-/model glm-5.3-flash
-/model kimi-k2.7-code
-```
+Claude Code 固定保留一个 `Default` 行；Harness 将它映射到
+`ark/glm-5.3-flash`，不会访问清单外模型。
 
 安装本机 Bash 快捷命令：
 

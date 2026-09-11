@@ -12,9 +12,8 @@ if [[ -f "$provider_file" ]]; then
   set +a
 fi
 
-ccr_base_url="${AGENT_HARNESS_CCR_BASE_URL:-http://127.0.0.1:3456}"
-ccr_auth_token="${AGENT_HARNESS_CCR_AUTH_TOKEN:-${CCR_API_KEY:-agent-harness-local-client}}"
 start_ccr="${AGENT_HARNESS_START_CCR:-1}"
+ccr_profile="${AGENT_HARNESS_CCR_PROFILE:-default-claude-code}"
 
 if [[ "$start_ccr" != "0" && "${AGENT_HARNESS_DRY_RUN:-}" != "1" ]]; then
   if ! command -v ccr >/dev/null 2>&1; then
@@ -30,21 +29,28 @@ unset ANTHROPIC_API_KEY
 unset ANTHROPIC_IDENTITY_TOKEN_FILE
 unset ANTHROPIC_ORGANIZATION_ID
 unset ANTHROPIC_FEDERATION_RULE_ID
+unset ANTHROPIC_MODEL
+unset ANTHROPIC_SMALL_FAST_MODEL
+unset ANTHROPIC_DEFAULT_MODEL
+unset ANTHROPIC_DEFAULT_FABLE_MODEL
+unset ANTHROPIC_DEFAULT_OPUS_MODEL
+unset ANTHROPIC_DEFAULT_SONNET_MODEL
+unset ANTHROPIC_DEFAULT_HAIKU_MODEL
 unset CLAUDE_AGENT_API_BASE_URL
 unset CCR_CLAUDE_CODE_MODEL
 unset CODEXL_CLAUDE_CODE_MODEL
+unset CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY
 
-export ANTHROPIC_BASE_URL="$ccr_base_url"
-export ANTHROPIC_AUTH_TOKEN="$ccr_auth_token"
-export ANTHROPIC_API_KEY="$ccr_auth_token"
+export AGENT_HARNESS_CCR_PROFILE="$ccr_profile"
+export CLAUDE_EXECUTABLE="$repo_root/scripts/ccr-claude.sh"
 
-printf 'Starting Agent Harness through Claude Code Router (%s).\n' "$ccr_base_url" >&2
-printf 'Use Claude Code /model to switch among models configured in CCR.\n' >&2
+printf 'Starting Agent Harness through Claude Code Router profile %s.\n' "$ccr_profile" >&2
+printf 'Use Claude Code /model to switch among Harness-approved CCR models.\n' >&2
 
 cd "$repo_root"
 
 if [[ "${AGENT_HARNESS_DRY_RUN:-}" == "1" ]]; then
-  printf 'ANTHROPIC_BASE_URL=%s\n' "$ANTHROPIC_BASE_URL"
+  printf 'CLAUDE_EXECUTABLE=%s\n' "$CLAUDE_EXECUTABLE"
   printf 'npm run dev -- controlled-run'
   for arg in "$@"; do
     printf ' %q' "$arg"
