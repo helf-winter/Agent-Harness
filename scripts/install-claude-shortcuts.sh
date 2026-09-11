@@ -44,6 +44,25 @@ EOF
   chmod 700 "$target"
 }
 
+install_harness_shortcut() {
+  local target="$bin_dir/harness"
+
+  if [[ -e "$target" ]] && ! grep -q 'agent-harness ccr shortcut' "$target" 2>/dev/null; then
+    printf 'Refusing to overwrite existing file: %s\n' "$target" >&2
+    exit 1
+  fi
+
+  cat > "$target" <<EOF
+#!/usr/bin/env bash
+# agent-harness ccr shortcut
+set -euo pipefail
+cd "$repo_root"
+exec bash scripts/harness.sh "\$@"
+EOF
+  chmod 700 "$target"
+}
+
+install_harness_shortcut
 install_menu_shortcut
 install_shortcut glm ark-glm
 install_shortcut kimi ark-kimi
@@ -60,4 +79,4 @@ case ":$PATH:" in
     ;;
 esac
 
-printf 'Installed Claude provider shortcuts: cc, glm, kimi, ds, dsp\n'
+printf 'Installed Agent Harness shortcuts: harness, cc, glm, kimi, ds, dsp\n'
