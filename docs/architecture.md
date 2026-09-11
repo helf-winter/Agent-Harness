@@ -56,7 +56,7 @@ Harness 是用户入口、管理层和控制面，负责启动 Claude Code contr
 
 当前已实现的硬门禁是 lifecycle-aware `PreToolUse`：读工具在完成前放行，写工具仅在 `EXECUTE` 放行，`Bash` 仅在 `EXECUTE`、`VERIFY`、`REVIEW` 放行，`COMPLETE` 后拒绝继续工具调用。MCP 仍用于 Claude 向 Harness 请求阶段转换和记录 TaskNode，但是否转换成功由 Harness Controller 决定。
 
-默认入口 `harness` 会让 Claude Code 连接 Claude Code Router gateway，而不是在 Agent Harness 内保存上游供应商密钥。模型选择由 Claude Code 的 `/model` 命令触发，CCR 根据模型名路由到上游 provider。旧的 `glm`、`kimi`、`ds`、`dsp` provider 快捷入口仍可用于兼容测试，但不是默认入口。
+默认入口 `harness` 会让 Claude Code 连接 Claude Code Router gateway，而不是在 Agent Harness 内保存上游供应商密钥。模型选择由 Claude Code 的 `/model` 命令触发，CCR 根据模型名路由到上游 provider。旧的 `glm`、`kimi`、`kimi3`、`ds`、`dsp` provider 快捷入口仍可用于兼容测试，但不是默认入口。
 
 ## 3. 标识与关联
 

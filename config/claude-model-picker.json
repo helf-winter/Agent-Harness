@@ -4,6 +4,7 @@
   "availableModels": [
     "ark/glm-5.3-flash",
     "ark/kimi-k2.7-code",
+    "ark/kimi-k3",
     "deepseek/deepseek-v4-flash",
     "deepseek/deepseek-v4-pro"
   ],
@@ -26,6 +27,12 @@
         "model": "ark/kimi-k2.7-code",
         "label": "Kimi K2.7 Code (Ark)",
         "description": "Kimi coding model through Volcengine Ark",
+        "behavesAs": "claude-sonnet-4-6"
+      },
+      {
+        "model": "ark/kimi-k3",
+        "label": "Kimi K3 (Ark)",
+        "description": "Kimi K3 coding model through Volcengine Ark",
         "behavesAs": "claude-sonnet-4-6"
       },
       {

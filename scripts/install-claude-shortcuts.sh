@@ -66,6 +66,7 @@ install_harness_shortcut
 install_menu_shortcut
 install_shortcut glm ark-glm
 install_shortcut kimi ark-kimi
+install_shortcut kimi3 ark-kimi3
 install_shortcut ds deepseek-flash
 install_shortcut dsp deepseek-pro
 
@@ -79,4 +80,4 @@ case ":$PATH:" in
     ;;
 esac
 
-printf 'Installed Agent Harness shortcuts: harness, cc, glm, kimi, ds, dsp\n'
+printf 'Installed Agent Harness shortcuts: harness, cc, glm, kimi, kimi3, ds, dsp\n'

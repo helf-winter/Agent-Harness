@@ -72,7 +72,7 @@ describe("Harness CCR launcher", () => {
     ]);
   });
 
-  it("exposes only the four supported provider models in the Claude picker", () => {
+  it("exposes only the five supported provider models in the Claude picker", () => {
     const settings = JSON.parse(readFileSync(resolve("config/claude-model-picker.json"), "utf8")) as {
       apiKeyHelper: string;
       availableModels: string[];
@@ -86,6 +86,7 @@ describe("Harness CCR launcher", () => {
     const expectedModels = [
       "ark/glm-5.3-flash",
       "ark/kimi-k2.7-code",
+      "ark/kimi-k3",
       "deepseek/deepseek-v4-flash",
       "deepseek/deepseek-v4-pro",
     ];
@@ -140,5 +141,6 @@ describe("Harness CCR launcher", () => {
     expect(harnessShortcut).toContain("agent-harness ccr shortcut");
     expect(harnessShortcut).toContain("exec bash scripts/harness.sh");
     expect(readFileSync(join(binDirectory, "cc"), "utf8")).toContain("claude-provider-menu.sh");
+    expect(readFileSync(join(binDirectory, "kimi3"), "utf8")).toContain("ark-kimi3");
   });
 });

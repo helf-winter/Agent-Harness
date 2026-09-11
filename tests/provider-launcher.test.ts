@@ -43,4 +43,20 @@ describe("Claude provider launcher", () => {
     expect(result.stdout).toContain("npm run dev -- controlled-run --model kimi-k2.7-code");
     expect(result.stdout).not.toContain("direct claude");
   });
+
+  it("starts Agent Harness with the Ark Kimi K3 profile", () => {
+    const result = spawnSync("bash", ["scripts/claude-provider.sh", "ark-kimi3", "--print", "hi"], {
+      cwd: resolve("."),
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        ARK_API_KEY: "test-ark-key",
+        AGENT_HARNESS_DRY_RUN: "1",
+      },
+    });
+
+    expect(result.status, result.stderr || result.stdout).toBe(0);
+    expect(result.stderr).toContain("Starting Agent Harness with Volcano Ark (kimi-k3).");
+    expect(result.stdout).toContain("npm run dev -- controlled-run --model kimi-k3 --print hi");
+  });
 });

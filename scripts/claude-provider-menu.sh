@@ -10,8 +10,9 @@ Select Claude Code provider:
 
   1) glm   Volcano Ark / glm-5.3-flash
   2) kimi  Volcano Ark / kimi-k2.7-code
-  3) ds    DeepSeek official / deepseek-v4-flash
-  4) dsp   DeepSeek official / deepseek-v4-pro
+  3) kimi3 Volcano Ark / kimi-k3
+  4) ds    DeepSeek official / deepseek-v4-flash
+  5) dsp   DeepSeek official / deepseek-v4-pro
 
 EOF
 }
@@ -20,7 +21,7 @@ selection="${1:-}"
 
 if [[ -z "$selection" ]]; then
   print_menu
-  read -r -p "Choice [1-4, glm, kimi, ds, dsp]: " selection
+  read -r -p "Choice [1-5, glm, kimi, kimi3, ds, dsp]: " selection
 fi
 
 case "$selection" in
@@ -30,10 +31,13 @@ case "$selection" in
   2|kimi|ark-kimi|kimi-k2.7-code)
     exec bash scripts/claude-provider.sh ark-kimi "${@:2}"
     ;;
-  3|ds|deepseek|deepseek-flash|deepseek-v4-flash)
+  3|kimi3|k3|ark-kimi3|kimi-k3)
+    exec bash scripts/claude-provider.sh ark-kimi3 "${@:2}"
+    ;;
+  4|ds|deepseek|deepseek-flash|deepseek-v4-flash)
     exec bash scripts/claude-provider.sh deepseek-flash "${@:2}"
     ;;
-  4|dsp|deepseek-pro|deepseek-v4-pro)
+  5|dsp|deepseek-pro|deepseek-v4-pro)
     exec bash scripts/claude-provider.sh deepseek-pro "${@:2}"
     ;;
   -h|--help|help)
