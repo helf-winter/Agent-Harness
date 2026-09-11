@@ -1,4 +1,5 @@
 {
+  "apiKeyHelper": "bash scripts/ccr-api-key-helper.sh",
   "model": "ark/glm-5.3-flash",
   "availableModels": [
     "ark/glm-5.3-flash",

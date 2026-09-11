@@ -74,6 +74,7 @@ describe("Harness CCR launcher", () => {
 
   it("exposes only the four supported provider models in the Claude picker", () => {
     const settings = JSON.parse(readFileSync(resolve("config/claude-model-picker.json"), "utf8")) as {
+      apiKeyHelper: string;
       availableModels: string[];
       enforceAvailableModels: boolean;
       env: Record<string, string>;
@@ -89,6 +90,7 @@ describe("Harness CCR launcher", () => {
       "deepseek/deepseek-v4-pro",
     ];
 
+    expect(settings.apiKeyHelper).toBe("bash scripts/ccr-api-key-helper.sh");
     expect(settings.availableModels).toEqual(expectedModels);
     expect(settings.enforceAvailableModels).toBe(true);
     expect(settings.env).toMatchObject({
@@ -98,6 +100,25 @@ describe("Harness CCR launcher", () => {
     });
     expect(settings.modelPicker.replaceBuiltInOptions).toBe(true);
     expect(settings.modelPicker.options.map(({ model }) => model)).toEqual(expectedModels);
+  });
+
+  it("returns the current CCR profile identity instead of an upstream provider key", () => {
+    const directory = mkdtempSync(join(tmpdir(), "agent-harness-ccr-identity-"));
+    temporaryDirectories.push(directory);
+    const identityFile = join(directory, "identity-token");
+    writeFileSync(identityFile, "test-ccr-profile-identity\n", { mode: 0o600 });
+
+    const result = spawnSync("bash", ["scripts/ccr-api-key-helper.sh"], {
+      cwd: resolve("."),
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        ANTHROPIC_IDENTITY_TOKEN_FILE: identityFile,
+      },
+    });
+
+    expect(result.status, result.stderr || result.stdout).toBe(0);
+    expect(result.stdout).toBe("test-ccr-profile-identity\n");
   });
 
   it("installs the harness shortcut beside legacy provider shortcuts", () => {
