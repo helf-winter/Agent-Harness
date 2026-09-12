@@ -136,6 +136,7 @@ describe("Harness CCR launcher", () => {
     const directory = mkdtempSync(join(tmpdir(), "agent-harness-shortcuts-"));
     temporaryDirectories.push(directory);
     const binDirectory = join(directory, "bin");
+    const configDirectory = join(directory, "config");
 
     const result = spawnSync("bash", ["scripts/install-claude-shortcuts.sh"], {
       cwd: resolve("."),
@@ -143,6 +144,7 @@ describe("Harness CCR launcher", () => {
       env: {
         ...process.env,
         AGENT_HARNESS_BIN_DIR: binDirectory,
+        AGENT_HARNESS_CONFIG_DIR: configDirectory,
       },
     });
 
@@ -152,6 +154,11 @@ describe("Harness CCR launcher", () => {
     expect(harnessShortcut).toContain("exec bash scripts/harness.sh");
     expect(readFileSync(join(binDirectory, "cc"), "utf8")).toContain("claude-provider-menu.sh");
     expect(readFileSync(join(binDirectory, "kimi3"), "utf8")).toContain("ark-kimi3");
+    const globalSettings = JSON.parse(readFileSync(join(configDirectory, "claude-model-picker.json"), "utf8")) as {
+      apiKeyHelper: string;
+    };
+    expect(globalSettings.apiKeyHelper).toBe(`bash ${resolve("scripts/ccr-api-key-helper.sh")}`);
+    expect(harnessShortcut).toContain(`AGENT_HARNESS_CLAUDE_SETTINGS="${join(configDirectory, "claude-model-picker.json")}"`);
   });
 
   it("updates old unmarked Agent Harness provider shortcuts", () => {

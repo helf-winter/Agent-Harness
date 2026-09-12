@@ -3,8 +3,20 @@ set -euo pipefail
 
 repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 bin_dir="${AGENT_HARNESS_BIN_DIR:-$HOME/.local/bin}"
+config_dir="${AGENT_HARNESS_CONFIG_DIR:-$HOME/.config/agent-harness}"
+settings_file="$config_dir/claude-model-picker.json"
 
 mkdir -p "$bin_dir"
+mkdir -p "$config_dir"
+
+node --input-type=module -e '
+  import { readFileSync, writeFileSync } from "node:fs";
+  const [source, target, helper] = process.argv.slice(1);
+  const settings = JSON.parse(readFileSync(source, "utf8"));
+  settings.apiKeyHelper = `bash ${helper}`;
+  writeFileSync(target, `${JSON.stringify(settings, null, 2)}\n`);
+' "$repo_root/config/claude-model-picker.json" "$settings_file" "$repo_root/scripts/ccr-api-key-helper.sh"
+chmod 600 "$settings_file"
 
 is_managed_shortcut() {
   local target="$1"
@@ -32,6 +44,7 @@ set -euo pipefail
 working_directory="\$(pwd -P)"
 cd "$repo_root"
 export AGENT_HARNESS_WORKING_DIRECTORY="\$working_directory"
+export AGENT_HARNESS_CLAUDE_SETTINGS="$settings_file"
 exec bash scripts/claude-provider.sh "$profile" "\$@"
 EOF
   chmod 700 "$target"
@@ -52,6 +65,7 @@ set -euo pipefail
 working_directory="\$(pwd -P)"
 cd "$repo_root"
 export AGENT_HARNESS_WORKING_DIRECTORY="\$working_directory"
+export AGENT_HARNESS_CLAUDE_SETTINGS="$settings_file"
 exec bash scripts/claude-provider-menu.sh "\$@"
 EOF
   chmod 700 "$target"
@@ -72,6 +86,7 @@ set -euo pipefail
 working_directory="\$(pwd -P)"
 cd "$repo_root"
 export AGENT_HARNESS_WORKING_DIRECTORY="\$working_directory"
+export AGENT_HARNESS_CLAUDE_SETTINGS="$settings_file"
 exec bash scripts/harness.sh "\$@"
 EOF
   chmod 700 "$target"
