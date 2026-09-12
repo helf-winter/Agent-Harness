@@ -11,4 +11,11 @@ describe("managed Harness Agent prompt", () => {
     expect(prompt).not.toContain("Claude Code worker");
     expect(prompt).not.toContain("Call `mcp__harness__harness_get_context` before doing task work.");
   });
+
+  it("does not present Harness context lookup as a mandatory ritual", () => {
+    const mcpSource = readFileSync(resolve("src/integration/mcp-server.ts"), "utf8");
+
+    expect(mcpSource).not.toContain("Call this before requesting a stage transition.");
+    expect(mcpSource).toContain("Use when exact Task, Trace, lifecycle stage, or recent evidence IDs are needed");
+  });
 });

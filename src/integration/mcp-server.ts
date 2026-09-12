@@ -26,7 +26,7 @@ server.registerTool(
   "harness_get_context",
   {
     description:
-      "Read the current Harness Task, Trace, lifecycle stage, and recent evidence IDs. Call this before requesting a stage transition.",
+      "Use when exact Task, Trace, lifecycle stage, or recent evidence IDs are needed for a concrete Harness Agent operation.",
     inputSchema: {},
   },
   async () => textResult(service.getContext()),
