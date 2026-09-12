@@ -54,7 +54,7 @@ cd "$repo_root"
 if [[ "${AGENT_HARNESS_DRY_RUN:-}" == "1" ]]; then
   printf 'CLAUDE_EXECUTABLE=%s\n' "$CLAUDE_EXECUTABLE"
   printf 'AGENT_HARNESS_WORKING_DIRECTORY=%s\n' "$AGENT_HARNESS_WORKING_DIRECTORY"
-  printf 'npm run dev -- controlled-run'
+  printf 'npm run dev -- agent-run'
   for arg in "$@"; do
     printf ' %q' "$arg"
   done
@@ -62,4 +62,4 @@ if [[ "${AGENT_HARNESS_DRY_RUN:-}" == "1" ]]; then
   exit 0
 fi
 
-exec npm run dev -- controlled-run "$@"
+exec npm run dev -- agent-run "$@"

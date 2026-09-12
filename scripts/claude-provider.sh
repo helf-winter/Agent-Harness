@@ -108,7 +108,7 @@ export AGENT_HARNESS_WORKING_DIRECTORY="$working_directory"
 printf 'Starting Agent Harness with %s (%s).\n' "$provider_name" "$model" >&2
 if [[ "${AGENT_HARNESS_DRY_RUN:-}" == "1" ]]; then
   printf 'AGENT_HARNESS_WORKING_DIRECTORY=%s\n' "$AGENT_HARNESS_WORKING_DIRECTORY"
-  printf 'npm run dev -- controlled-run --model %s' "$model"
+  printf 'npm run dev -- agent-run --model %s' "$model"
   for arg in "$@"; do
     printf ' %q' "$arg"
   done
@@ -116,4 +116,4 @@ if [[ "${AGENT_HARNESS_DRY_RUN:-}" == "1" ]]; then
   exit 0
 fi
 
-exec npm run dev -- controlled-run --model "$model" "$@"
+exec npm run dev -- agent-run --model "$model" "$@"

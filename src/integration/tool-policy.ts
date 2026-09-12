@@ -1,7 +1,7 @@
 import type { Stage } from "../domain/lifecycle.js";
 import type { ClaudeHookInput } from "./hook-processor.js";
 
-export type HarnessControlMode = "audit" | "enforce";
+export type HarnessSafetyMode = "audit" | "enforce";
 
 export interface ToolPolicyContext {
   currentStage?: Stage;
@@ -9,7 +9,7 @@ export interface ToolPolicyContext {
 
 export interface ToolPolicyDecision {
   allowed: boolean;
-  mode: HarnessControlMode;
+  mode: HarnessSafetyMode;
   reason: string;
 }
 
@@ -35,10 +35,10 @@ const WRITE_ALLOWED_STAGES = new Set<Stage>(["EXECUTE"]);
 export function evaluateToolPolicy(
   input: ClaudeHookInput,
   context: ToolPolicyContext,
-  mode: HarnessControlMode,
+  mode: HarnessSafetyMode,
 ): ToolPolicyDecision {
   if (mode === "audit") {
-    return { allowed: true, mode, reason: "Harness control mode is audit." };
+    return { allowed: true, mode, reason: "Harness safety mode is audit." };
   }
 
   const toolName = input.tool_name ?? "unknown";

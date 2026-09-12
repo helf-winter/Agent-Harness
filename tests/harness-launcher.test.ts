@@ -15,6 +15,13 @@ afterEach(() => {
 });
 
 describe("Harness CCR launcher", () => {
+  it("presents agent-run as the official Claude execution entrypoint", () => {
+    const cliSource = readFileSync(resolve("src/cli.ts"), "utf8");
+
+    expect(cliSource).toContain("harness agent-run [claude arguments...]");
+    expect(cliSource).not.toContain("harness controlled-run [claude arguments...]");
+  });
+
   it("starts Agent Harness through a CCR-owned Claude launcher", () => {
     const directory = mkdtempSync(join(tmpdir(), "agent-harness-ccr-"));
     temporaryDirectories.push(directory);
@@ -34,7 +41,7 @@ describe("Harness CCR launcher", () => {
     expect(result.stderr).toContain("Starting Agent Harness through Claude Code Router");
     expect(result.stdout).toContain("CLAUDE_EXECUTABLE=");
     expect(result.stdout).toContain("scripts/ccr-claude.sh");
-    expect(result.stdout).toContain("npm run dev -- controlled-run --permission-mode acceptEdits");
+    expect(result.stdout).toContain("npm run dev -- agent-run --permission-mode acceptEdits");
     expect(result.stdout).not.toContain("ANTHROPIC_BASE_URL");
     expect(result.stdout).not.toContain("ANTHROPIC_AUTH_TOKEN");
     expect(result.stdout).not.toContain("ANTHROPIC_API_KEY");

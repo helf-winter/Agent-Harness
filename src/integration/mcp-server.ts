@@ -98,7 +98,7 @@ server.registerTool(
   "harness_transition_stage",
   {
     description:
-      "Request a deterministic lifecycle stage transition. The controller rejects skipped stages and nonexistent or out-of-scope evidence.",
+      "Commit a deterministic lifecycle stage transition. Harness validates skipped stages and nonexistent or out-of-scope evidence before accepting it.",
     inputSchema: {
       to: z.enum(STAGES),
       reason: z.string().min(1),

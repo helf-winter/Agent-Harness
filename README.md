@@ -18,7 +18,7 @@
 - Claude Code、Node、Git 与 Bash 环境诊断。
 - Session、Task、Turn、Trace 的可重放查询投影。
 - Claude Code Session、Prompt、工具和 Stop Hook Adapter。
-- `harness` / `harness controlled-run` 启动入口和 `harness trace` 查询命令。
+- `harness` / `harness agent-run` 启动入口和 `harness trace` 查询命令；`controlled-run` 仅作为旧兼容别名保留。
 - Harness Agent mode 下的 Hook 安全带：Harness 控制面工具和读工具可在完成前使用，写工具仅在 `EXECUTE` 放行，`Bash` 仅在 `EXECUTE`、`VERIFY`、`REVIEW` 放行。
 - Harness MCP 上下文、轻量 Note、Task 创建/切换、Observation 和阶段转换工具。
 - Harness MCP 递归 TaskNode 创建、分解、DFS/BFS 选择和节点状态回写工具。
@@ -58,7 +58,7 @@ npm run typecheck
 npm test
 npm run build
 npm run harness
-npm run dev -- controlled-run
+npm run dev -- agent-run
 npm run dev -- trace list
 npm run dev -- task tree <task-id|trace-id>
 npm run dev -- task node <node-id>
@@ -83,7 +83,7 @@ harness
 该入口会：
 
 1. 启动或复用 Claude Code Router，也就是 `ccr`；
-2. 进入 Agent Harness controlled mode；
+2. 进入 Harness Agent mode；
 3. 由 Harness 调用 CCR 的 `default-claude-code` profile；
 4. 由 CCR 注入 gateway 地址、profile 身份凭据和模型路由，再启动 Claude Code；
 5. 自动加载 Harness 的五模型选择器，进入 Claude 后使用 `/model` 切换。

@@ -11,7 +11,7 @@ import { REDACTION_RULES_VERSION } from "../security/redactor.js";
 import { EventLedger } from "../storage/event-ledger.js";
 import {
   evaluateToolPolicy,
-  type HarnessControlMode,
+  type HarnessSafetyMode,
 } from "./tool-policy.js";
 import {
   harnessDatabasePath,
@@ -62,7 +62,7 @@ export class HookProcessor {
   readonly #runtimeInstanceId: string;
   readonly #projectId: string;
   readonly #adapterVersion: string;
-  readonly #controlMode: HarnessControlMode;
+  readonly #safetyMode: HarnessSafetyMode;
 
   constructor(
     databasePath: string,
@@ -70,7 +70,8 @@ export class HookProcessor {
       runtimeInstanceId: string;
       projectId: string;
       adapterVersion: string;
-      controlMode?: HarnessControlMode;
+      safetyMode?: HarnessSafetyMode;
+      controlMode?: HarnessSafetyMode;
     },
   ) {
     this.#ledger = new EventLedger(databasePath);
@@ -78,7 +79,7 @@ export class HookProcessor {
     this.#runtimeInstanceId = options.runtimeInstanceId;
     this.#projectId = options.projectId;
     this.#adapterVersion = options.adapterVersion;
-    this.#controlMode = options.controlMode ?? "audit";
+    this.#safetyMode = options.safetyMode ?? options.controlMode ?? "audit";
   }
 
   process(input: ClaudeHookInput): HookProcessResult {
@@ -148,7 +149,7 @@ export class HookProcessor {
         ? evaluateToolPolicy(
             input,
             trace ? { currentStage: trace.currentStage } : {},
-            this.#controlMode,
+            this.#safetyMode,
           )
         : undefined;
     const mapped = mapHookEvent(input, scope, policyDecision);
@@ -409,7 +410,10 @@ export function processHookFromEnvironment(input: ClaudeHookInput): HookProcessR
     runtimeInstanceId: process.env.HARNESS_RUNTIME_INSTANCE_ID ?? `runtime_${randomUUID()}`,
     projectId: process.env.HARNESS_PROJECT_ID ?? stableProjectId(input.cwd),
     adapterVersion: process.env.HARNESS_CLAUDE_VERSION ?? "unknown",
-    controlMode: process.env.HARNESS_CONTROL_MODE === "enforce" ? "enforce" : "audit",
+    safetyMode:
+      process.env.HARNESS_SAFETY_MODE === "enforce" || process.env.HARNESS_CONTROL_MODE === "enforce"
+        ? "enforce"
+        : "audit",
   });
   try {
     return processor.process(input);

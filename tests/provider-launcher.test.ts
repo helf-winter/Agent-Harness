@@ -40,7 +40,7 @@ describe("Claude provider launcher", () => {
 
     expect(result.status, result.stderr || result.stdout).toBe(0);
     expect(result.stderr).toContain("Starting Agent Harness with Volcano Ark (kimi-k2.7-code).");
-    expect(result.stdout).toContain("npm run dev -- controlled-run --model kimi-k2.7-code");
+    expect(result.stdout).toContain("npm run dev -- agent-run --model kimi-k2.7-code");
     expect(result.stdout).not.toContain("direct claude");
   });
 
@@ -57,6 +57,6 @@ describe("Claude provider launcher", () => {
 
     expect(result.status, result.stderr || result.stdout).toBe(0);
     expect(result.stderr).toContain("Starting Agent Harness with Volcano Ark (kimi-k3).");
-    expect(result.stdout).toContain("npm run dev -- controlled-run --model kimi-k3 --print hi");
+    expect(result.stdout).toContain("npm run dev -- agent-run --model kimi-k3 --print hi");
   });
 });

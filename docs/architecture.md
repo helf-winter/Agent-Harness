@@ -97,7 +97,7 @@ Session 删除采用非级联策略：删除 Session 元数据和原始对话后
 
 ## 6. 自动晋升
 
-MVP 中 Skill 自动晋升要求：
+当前实现中 Skill 自动晋升要求：
 
 - development、validation、regression 和 holdout 必选 Case 全部通过。
 - 每项运行三次且结果稳定。
