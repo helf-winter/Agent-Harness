@@ -159,7 +159,7 @@ function runClaude(args: string[]): number {
     return 1;
   }
 
-  const projectDirectory = process.cwd();
+  const projectDirectory = resolve(process.env.AGENT_HARNESS_WORKING_DIRECTORY ?? process.cwd());
   const child = spawnSync(
     claudeExecutable,
     ["--plugin-dir", pluginDirectory, "--append-system-prompt-file", managedPrompt, ...args],

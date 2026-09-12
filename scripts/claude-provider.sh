@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+working_directory="${AGENT_HARNESS_WORKING_DIRECTORY:-$(pwd -P)}"
+
 usage() {
   cat >&2 <<'EOF'
 Usage: scripts/claude-provider.sh <profile> [harness/claude arguments...]
@@ -101,9 +103,11 @@ export ANTHROPIC_MODEL="$model"
 export ANTHROPIC_DEFAULT_OPUS_MODEL="$model"
 export ANTHROPIC_DEFAULT_SONNET_MODEL="$model"
 export ANTHROPIC_DEFAULT_HAIKU_MODEL="$model"
+export AGENT_HARNESS_WORKING_DIRECTORY="$working_directory"
 
 printf 'Starting Agent Harness with %s (%s).\n' "$provider_name" "$model" >&2
 if [[ "${AGENT_HARNESS_DRY_RUN:-}" == "1" ]]; then
+  printf 'AGENT_HARNESS_WORKING_DIRECTORY=%s\n' "$AGENT_HARNESS_WORKING_DIRECTORY"
   printf 'npm run dev -- controlled-run --model %s' "$model"
   for arg in "$@"; do
     printf ' %q' "$arg"

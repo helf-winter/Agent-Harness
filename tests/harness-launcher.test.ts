@@ -143,4 +143,61 @@ describe("Harness CCR launcher", () => {
     expect(readFileSync(join(binDirectory, "cc"), "utf8")).toContain("claude-provider-menu.sh");
     expect(readFileSync(join(binDirectory, "kimi3"), "utf8")).toContain("ark-kimi3");
   });
+
+  it("updates old unmarked Agent Harness provider shortcuts", () => {
+    const directory = mkdtempSync(join(tmpdir(), "agent-harness-old-shortcuts-"));
+    temporaryDirectories.push(directory);
+    const binDirectory = join(directory, "bin");
+    mkdirSync(binDirectory);
+    writeFileSync(
+      join(binDirectory, "glm"),
+      "#!/usr/bin/env bash\nset -euo pipefail\ncd \"/old/repo\"\nexec bash scripts/claude-provider.sh \"ark-glm\" \"$@\"\n",
+      { mode: 0o700 },
+    );
+
+    const result = spawnSync("bash", ["scripts/install-claude-shortcuts.sh"], {
+      cwd: resolve("."),
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        AGENT_HARNESS_BIN_DIR: binDirectory,
+      },
+    });
+
+    expect(result.status, result.stderr || result.stdout).toBe(0);
+    const shortcut = readFileSync(join(binDirectory, "glm"), "utf8");
+    expect(shortcut).toContain("agent-harness claude provider shortcut");
+    expect(shortcut).toContain("AGENT_HARNESS_WORKING_DIRECTORY");
+  });
+
+  it("preserves the caller working directory when using the installed harness shortcut", () => {
+    const directory = mkdtempSync(join(tmpdir(), "agent-harness-shortcut-cwd-"));
+    temporaryDirectories.push(directory);
+    const binDirectory = join(directory, "bin");
+    const projectDirectory = join(directory, "project");
+    mkdirSync(projectDirectory);
+
+    const install = spawnSync("bash", ["scripts/install-claude-shortcuts.sh"], {
+      cwd: resolve("."),
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        AGENT_HARNESS_BIN_DIR: binDirectory,
+      },
+    });
+    expect(install.status, install.stderr || install.stdout).toBe(0);
+
+    const result = spawnSync(join(binDirectory, "harness"), ["--print", "pwd"], {
+      cwd: projectDirectory,
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        AGENT_HARNESS_DRY_RUN: "1",
+        AGENT_HARNESS_START_CCR: "0",
+      },
+    });
+
+    expect(result.status, result.stderr || result.stdout).toBe(0);
+    expect(result.stdout).toContain(`AGENT_HARNESS_WORKING_DIRECTORY=${projectDirectory}`);
+  });
 });

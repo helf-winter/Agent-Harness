@@ -125,6 +125,9 @@ bash scripts/install-claude-shortcuts.sh
 harness
 ```
 
+`harness` 应在你要处理的项目目录里执行。快捷脚本会回到 Agent Harness 仓库加载自身代码，
+但会保留调用时的工作目录作为 Claude Code 的项目目录。
+
 ## 兼容入口：直接 provider 启动
 
 以下旧入口仍保留，方便绕过 CCR 直接指定 provider/model；但默认推荐使用 `harness` +
