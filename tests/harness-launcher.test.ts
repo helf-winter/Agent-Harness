@@ -45,9 +45,13 @@ describe("Harness CCR launcher", () => {
     temporaryDirectories.push(directory);
     const fakeBin = join(directory, "bin");
     const captureFile = join(directory, "ccr-arguments.txt");
+    const settingsCaptureFile = join(directory, "ccr-settings.json");
     const fakeCcr = join(fakeBin, "ccr");
     mkdirSync(fakeBin);
-    writeFileSync(fakeCcr, `#!/usr/bin/env bash\nprintf '%s\\n' "$@" > "$CCR_CAPTURE_FILE"\n`);
+    writeFileSync(
+      fakeCcr,
+      `#!/usr/bin/env bash\nprintf '%s\\n' "$@" > "$CCR_CAPTURE_FILE"\ncp "$5" "$CCR_SETTINGS_CAPTURE_FILE"\n`,
+    );
     chmodSync(fakeCcr, 0o700);
 
     const result = spawnSync("bash", ["scripts/ccr-claude.sh", "--version"], {
@@ -57,19 +61,25 @@ describe("Harness CCR launcher", () => {
         ...process.env,
         PATH: `${fakeBin}${delimiter}${process.env.PATH ?? ""}`,
         CCR_CAPTURE_FILE: captureFile,
+        CCR_SETTINGS_CAPTURE_FILE: settingsCaptureFile,
         AGENT_HARNESS_CCR_PROFILE: "test-claude-profile",
       },
     });
 
     expect(result.status, result.stderr || result.stdout).toBe(0);
-    expect(readFileSync(captureFile, "utf8").trim().split("\n")).toEqual([
+    const ccrArguments = readFileSync(captureFile, "utf8").trim().split("\n");
+    const settingsPath = ccrArguments[4];
+
+    expect(ccrArguments).toEqual([
       "test-claude-profile",
       "cli",
       "--",
       "--settings",
-      resolve("config/claude-model-picker.json"),
+      settingsPath,
       "--version",
     ]);
+    const renderedSettings = JSON.parse(readFileSync(settingsCaptureFile, "utf8")) as { apiKeyHelper: string };
+    expect(renderedSettings.apiKeyHelper).toBe(`bash ${resolve("scripts/ccr-api-key-helper.sh")}`);
   });
 
   it("exposes only the five supported provider models in the Claude picker", () => {
