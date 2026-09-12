@@ -3,6 +3,7 @@
   "model": "ark/glm-5.3-flash",
   "availableModels": [
     "ark/glm-5.3-flash",
+    "ark/glm-5.3",
     "ark/kimi-k2.7-code",
     "ark/kimi-k3",
     "deepseek/deepseek-v4-flash",
@@ -21,6 +22,12 @@
         "model": "ark/glm-5.3-flash",
         "label": "GLM 5.3 Flash (Ark)",
         "description": "Fast GLM coding model through Volcengine Ark",
+        "behavesAs": "claude-sonnet-4-6"
+      },
+      {
+        "model": "ark/glm-5.3",
+        "label": "GLM 5.3 (Ark)",
+        "description": "GLM 5.3 coding model through Volcengine Ark",
         "behavesAs": "claude-sonnet-4-6"
       },
       {

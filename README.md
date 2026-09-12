@@ -104,6 +104,7 @@ CCR 时才需要修改。上游模型供应商 API Key 继续只在 CCR UI 中�
 
 ```text
 /model ark/glm-5.3-flash
+/model ark/glm-5.3
 /model ark/kimi-k2.7-code
 /model ark/kimi-k3
 /model deepseek/deepseek-v4-flash
@@ -155,28 +156,30 @@ npm run cc
 菜单会显示完整模型名：
 
 ```text
-1) glm   Volcano Ark / glm-5.3-flash
-2) kimi  Volcano Ark / kimi-k2.7-code
-3) kimi3 Volcano Ark / kimi-k3
-4) ds    DeepSeek official / deepseek-v4-flash
-5) dsp   DeepSeek official / deepseek-v4-pro
+1) glm    Volcano Ark / glm-5.3-flash
+2) glm53  Volcano Ark / glm-5.3
+3) kimi   Volcano Ark / kimi-k2.7-code
+4) kimi3  Volcano Ark / kimi-k3
+5) ds     DeepSeek official / deepseek-v4-flash
+6) dsp    DeepSeek official / deepseek-v4-pro
 ```
 
 也可以用以下短命令直接进入指定模型：
 
 ```bash
 npm run glm
+npm run glm53
 npm run kimi
 npm run kimi3
 npm run ds
 npm run dsp
 ```
 
-对应关系为：`glm` 使用方舟 `glm-5.3-flash`，`kimi` 使用方舟
-`kimi-k2.7-code`，`kimi3` 使用方舟 `kimi-k3`，`ds` 使用 DeepSeek
+对应关系为：`glm` 使用方舟 `glm-5.3-flash`，`glm53` 使用方舟
+`glm-5.3`，`kimi` 使用方舟 `kimi-k2.7-code`，`kimi3` 使用方舟 `kimi-k3`，`ds` 使用 DeepSeek
 `deepseek-v4-flash`，`dsp` 使用 DeepSeek `deepseek-v4-pro`。
 
-`cc`、`glm`、`kimi`、`kimi3`、`ds` 和 `dsp` 也是 Harness-first 兼容入口：先进入
+`cc`、`glm`、`glm53`、`kimi`、`kimi3`、`ds` 和 `dsp` 也是 Harness-first 兼容入口：先进入
 Agent Harness mode，再由 Harness 启动 Claude Code 并挂载 Hook、MCP 和 Harness
 Agent prompt。区别是它们在启动前已经固定了 provider/model，不依赖 CCR `/model`
 路由。
@@ -185,13 +188,14 @@ Agent prompt。区别是它们在启动前已经固定了 provider/model，不�
 
 ```bash
 npm run claude:ark:glm
+npm run claude:ark:glm53
 npm run claude:ark:kimi
 npm run claude:ark:kimi3
 npm run claude:deepseek:flash
 npm run claude:deepseek:pro
 ```
 
-方舟模型分别为 `glm-5.3-flash`、`kimi-k2.7-code`、`kimi-k3`；DeepSeek 使用官方
+方舟模型分别为 `glm-5.3-flash`、`glm-5.3`、`kimi-k2.7-code`、`kimi-k3`；DeepSeek 使用官方
 Anthropic 兼容地址与当前模型 `deepseek-v4-flash`、`deepseek-v4-pro`。命令行环境变量优先于密钥文件。
 
 独立 Skill 验证可使用相同供应商，但必须提供单独的隔离验证密钥：

@@ -37,6 +37,6 @@
 
 - 淘汰旧的本地 `127.0.0.1:3456` 网关配置。
 - 火山方舟 Claude Code 配置使用入口 `https://ark.cn-beijing.volces.com/api/coding/v3`。
-- 方舟配置提供 `glm-5.3-flash`、`kimi-k2.7-code` 和 `kimi-k3` 三个启动档位。
+- 方舟配置提供 `glm-5.3-flash`、`glm-5.3`、`kimi-k2.7-code` 和 `kimi-k3` 四个启动档位。
 - DeepSeek 使用官方 Anthropic 协议入口 `https://api.deepseek.com/anthropic`，提供 `deepseek-v4-flash` 和 `deepseek-v4-pro` 两个启动档位。
 - API Key 不写入仓库；用户私有密钥文件权限固定为 `0600`。

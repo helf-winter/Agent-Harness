@@ -9,6 +9,7 @@ Usage: scripts/claude-provider.sh <profile> [harness/claude arguments...]
 
 Profiles:
   ark-glm          Volcano Ark / glm-5.3-flash
+  ark-glm53        Volcano Ark / glm-5.3
   ark-kimi         Volcano Ark / kimi-k2.7-code
   ark-kimi3        Volcano Ark / kimi-k3
   deepseek-flash   DeepSeek official / deepseek-v4-flash
@@ -40,6 +41,13 @@ case "$profile" in
     provider_name="Volcano Ark"
     base_url="https://ark.cn-beijing.volces.com/api/coding/v3"
     model="glm-5.3-flash"
+    api_key="${ARK_API_KEY:-}"
+    key_name="ARK_API_KEY"
+    ;;
+  ark-glm53)
+    provider_name="Volcano Ark"
+    base_url="https://ark.cn-beijing.volces.com/api/coding/v3"
+    model="glm-5.3"
     api_key="${ARK_API_KEY:-}"
     key_name="ARK_API_KEY"
     ;;
