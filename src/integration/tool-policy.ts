@@ -53,6 +53,13 @@ export function evaluateToolPolicy(
   if (stage === "COMPLETE") {
     return { allowed: false, mode, reason: "Harness blocks tool use after COMPLETE." };
   }
+  if (isHarnessControlPlaneTool(toolName)) {
+    return {
+      allowed: true,
+      mode,
+      reason: `Harness allows control-plane tool ${toolName} during ${stage}.`,
+    };
+  }
   if (READ_ONLY_TOOLS.has(toolName)) {
     return { allowed: true, mode, reason: `Harness allows read-only ${toolName} during ${stage}.` };
   }
@@ -80,4 +87,10 @@ export function evaluateToolPolicy(
     mode,
     reason: `Harness has no allow rule for tool ${toolName} during ${stage}.`,
   };
+}
+
+function isHarnessControlPlaneTool(toolName: string): boolean {
+  return toolName === "harness" ||
+    toolName.startsWith("harness_") ||
+    toolName.startsWith("mcp__harness__");
 }

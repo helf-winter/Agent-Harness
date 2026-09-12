@@ -14,7 +14,7 @@
 | 文件变化 | Hook 事件及 Git Diff | Hook 仅作信号，Diff 由 Harness 独立采集 |
 | 模型切换 | 模型切换事件或流式元数据 | capability 不足时降级为结果元数据 |
 | 模型调用 | Claude 流式事件 | 仅保存模型、状态、Token、耗时等元数据 |
-| Stage 转换 | Harness MCP | 已实现；Controller 校验转换图及证据作用域 |
+| Stage 转换 | Harness MCP | 已实现；Harness Agent 请求转换，Controller 校验转换图及证据作用域 |
 | 测试证据 | Shell 工具结果 + Grader | 保存命令、退出码和结构化报告 |
 | Skill 发现 | Harness 投影器 | 只投影 `completed` 版本到生产目录 |
 
@@ -28,7 +28,7 @@
 
 - inline plugin 加载成功。
 - Harness MCP 状态为 `connected`。
-- 上下文、Task、Observation、阶段转换和结果评价工具均进入 Claude Code 工具表。
+- 上下文、轻量 Note、Task、Observation、阶段转换和结果评价工具均进入 Claude Code 工具表。
 - SessionStart、UserPromptSubmit、StopFailure 和 SessionEnd 事件成功写入事件账本。
 - 当时的未登录错误被记录为 `authentication_failed`，哈希链验证通过。
 - 用户环境中的第三方 ACE 插件存在独立的 `${ACE_ROOT}` Session Hook 路径问题；该错误不来自 Agent Harness。

@@ -87,6 +87,29 @@ describe("Harness-controlled Hook policy gate", () => {
     processor.close();
   });
 
+  it("allows Harness control-plane tools while the lifecycle is still in INTAKE", () => {
+    const directory = mkdtempSync(join(tmpdir(), "agent-harness-policy-"));
+    temporaryDirectories.push(directory);
+    const databasePath = join(directory, "harness.sqlite");
+    const processor = controlledProcessor(databasePath);
+    startTrace(processor);
+
+    expect(() =>
+      processor.process(
+        hookInput("PreToolUse", {
+          tool_name: "mcp__harness__harness_record_observation",
+          tool_use_id: "record-observation-in-intake",
+          tool_input: {
+            summary: "The user wants Harness to record context without blocking itself.",
+            evidenceEventIds: ["evt-placeholder"],
+          },
+        }),
+      ),
+    ).not.toThrow();
+
+    processor.close();
+  });
+
   it("allows source edits in EXECUTE after Harness advances the lifecycle", () => {
     const directory = mkdtempSync(join(tmpdir(), "agent-harness-policy-"));
     temporaryDirectories.push(directory);

@@ -83,6 +83,18 @@ server.registerTool(
 );
 
 server.registerTool(
+  "harness_record_note",
+  {
+    description:
+      "Record a lightweight Harness Agent note for the focused Task without first collecting evidence IDs. Use for user preferences, design decisions, and durable context that should not block the current stage.",
+    inputSchema: {
+      summary: z.string().min(1),
+    },
+  },
+  async ({ summary }) => textResult(service.recordNote(summary)),
+);
+
+server.registerTool(
   "harness_transition_stage",
   {
     description:

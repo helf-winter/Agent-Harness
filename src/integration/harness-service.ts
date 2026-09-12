@@ -225,6 +225,27 @@ export class HarnessService {
     return { eventId: result.event.eventId };
   }
 
+  recordNote(summary: string): { eventId: string } {
+    if (!summary.trim()) throw new Error("Note summary is required.");
+    const context = this.getContext();
+    const result = this.#ledger.append({
+      eventType: "note.recorded",
+      runtimeInstanceId: this.runtimeInstanceId,
+      sessionId: context.sessionId,
+      taskId: context.taskId,
+      traceId: context.traceId,
+      ...(context.turnId ? { turnId: context.turnId } : {}),
+      stageId: context.currentStageId,
+      correlationId: context.traceId,
+      actor: { type: "agent", id: "claude-code" },
+      source: { adapter: "harness-mcp", adapterVersion: "0.1.0" },
+      policyVersion: "default-1",
+      payload: { summary },
+    });
+    this.#projection.projectPending(this.#ledger);
+    return { eventId: result.event.eventId };
+  }
+
   transitionStage(
     to: Stage,
     reason: string,

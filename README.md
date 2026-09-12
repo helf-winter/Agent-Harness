@@ -19,8 +19,8 @@
 - Session、Task、Turn、Trace 的可重放查询投影。
 - Claude Code Session、Prompt、工具和 Stop Hook Adapter。
 - `harness` / `harness controlled-run` 启动入口和 `harness trace` 查询命令。
-- Harness controlled mode 下的 Hook 工具策略门禁：读工具可在完成前使用，写工具仅在 `EXECUTE` 放行，`Bash` 仅在 `EXECUTE`、`VERIFY`、`REVIEW` 放行。
-- Harness MCP 上下文、Task 创建/切换、Observation 和阶段转换工具。
+- Harness Agent mode 下的 Hook 安全带：Harness 控制面工具和读工具可在完成前使用，写工具仅在 `EXECUTE` 放行，`Bash` 仅在 `EXECUTE`、`VERIFY`、`REVIEW` 放行。
+- Harness MCP 上下文、轻量 Note、Task 创建/切换、Observation 和阶段转换工具。
 - Harness MCP 递归 TaskNode 创建、分解、DFS/BFS 选择和节点状态回写工具。
 - 自动发现 TypeScript 项目的 typecheck、build 和 test 命令。
 - 确定性 Result Evaluator；没有成功评价时不能进入 `COMPLETE`。
@@ -85,7 +85,7 @@ harness
 1. 启动或复用 Claude Code Router，也就是 `ccr`；
 2. 进入 Agent Harness controlled mode；
 3. 由 Harness 调用 CCR 的 `default-claude-code` profile；
-4. 由 CCR 注入 gateway 地址、profile 身份凭据和模型路由，再启动 Claude Code worker；
+4. 由 CCR 注入 gateway 地址、profile 身份凭据和模型路由，再启动 Claude Code；
 5. 自动加载 Harness 的五模型选择器，进入 Claude 后使用 `/model` 切换。
 
 可选配置文件：
@@ -177,8 +177,8 @@ npm run dsp
 `deepseek-v4-flash`，`dsp` 使用 DeepSeek `deepseek-v4-pro`。
 
 `cc`、`glm`、`kimi`、`kimi3`、`ds` 和 `dsp` 也是 Harness-first 兼容入口：先进入
-Agent Harness controlled mode，再由 Harness 启动 Claude Code 并挂载 Hook、MCP 和
-worker prompt。区别是它们在启动前已经固定了 provider/model，不依赖 CCR `/model`
+Agent Harness mode，再由 Harness 启动 Claude Code 并挂载 Hook、MCP 和 Harness
+Agent prompt。区别是它们在启动前已经固定了 provider/model，不依赖 CCR `/model`
 路由。
 
 原来的完整命令仍然保留：
@@ -217,7 +217,8 @@ export HARNESS_VALIDATION_MODEL=glm-5.3-flash
 
 - Claude Code CLI 执行真实模型任务前必须具备一种有效凭据：Anthropic 登录，或所选兼容供应商的 API Key。使用本项目的供应商启动命令时不需要再执行 `/login`。
 - 独立 Skill 验证刻意不读取用户 Claude 登录或系统钥匙串；真实验证需单独设置仅用于隔离验证的 `HARNESS_VALIDATION_AUTH_TOKEN`。第三方供应商还需设置 `HARNESS_VALIDATION_BASE_URL` 和 `HARNESS_VALIDATION_MODEL`；旧的 `HARNESS_VALIDATION_API_KEY` 仍向后兼容。未设置时 Skill 保持 `testing`。
-- Task 的语义分类仍由 Claude 通过 Harness MCP 辅助完成，确定性投影、作用域检查和工具门禁由 Harness Core 完成。
-- TaskNode 树已可通过 MCP 记录和查询；当前版本提供 DFS/BFS 下一节点建议，并通过 lifecycle-aware Hook gate 限制 Claude Code 在错误阶段执行写入或 Bash。
+- 进入 `harness` 后，模型以 Harness Agent 身份工作；Harness MCP 是它的 durable memory 和控制面，而不是外部审批系统。
+- Task 的语义分类由 Harness Agent 通过 MCP 记录，确定性投影、作用域检查和关键门禁由 Harness Core 完成。
+- TaskNode 树已可通过 MCP 记录和查询；当前版本提供 DFS/BFS 下一节点建议，并通过 lifecycle-aware Hook safety belt 限制错误阶段的写入或 Bash。
 - 第一阶段验证环境以 Bash 为基准；原生 PowerShell 仅用于本项目开发，不属于正式运行目标。
 - Git worktree 隔离文件状态，但不是完整 OS/网络沙箱；验证器因此只开放读取、编辑和受限的 npm/git Bash 命令。高风险 Skill 会直接验证失败。
