@@ -110,6 +110,21 @@ server.registerTool(
 );
 
 server.registerTool(
+  "harness_observe_and_transition",
+  {
+    description:
+      "Record a new Harness Agent observation from the latest focused-Trace evidence and immediately use it to commit a lifecycle stage transition. Use this when you know the next stage but do not need to manually inspect evidence IDs.",
+    inputSchema: {
+      to: z.enum(STAGES),
+      reason: z.string().min(1),
+      observationSummary: z.string().min(1),
+    },
+  },
+  async ({ to, reason, observationSummary }) =>
+    textResult(service.recordObservationAndTransition(to, reason, observationSummary)),
+);
+
+server.registerTool(
   "harness_get_task_tree",
   {
     description:

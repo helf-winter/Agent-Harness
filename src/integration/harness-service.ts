@@ -265,6 +265,24 @@ export class HarnessService {
     return this.getContext();
   }
 
+  recordObservationAndTransition(
+    to: Stage,
+    reason: string,
+    observationSummary: string,
+  ): { observationEventId: string; context: HarnessContext } {
+    if (!observationSummary.trim()) throw new Error("Observation summary is required.");
+    const context = this.getContext();
+    const latestEvidence = context.recentEvidence.at(-1);
+    if (!latestEvidence) {
+      throw new Error("At least one existing evidence event is required before observing and transitioning.");
+    }
+    const observation = this.recordObservation(observationSummary, [latestEvidence.eventId]);
+    return {
+      observationEventId: observation.eventId,
+      context: this.transitionStage(to, reason, [observation.eventId]),
+    };
+  }
+
   getTaskTree(): TaskTreeProjection & {
     next: Record<TraversalStrategy, TaskNodeProjection | null>;
   } {

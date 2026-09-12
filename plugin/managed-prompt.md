@@ -29,6 +29,7 @@ Do not skip stages for completion. Use `harness_transition_stage` with real evid
 - Decide whether a prompt continues the focused Task. If it is independent, use `harness_create_task`; if it returns to an earlier Task, use `harness_list_tasks` and `harness_focus_task`.
 - Use `harness_record_note` for lightweight user preferences, design decisions, and durable context that should not require evidence lookup.
 - Use `harness_record_observation` when a fact should be explicitly backed by concrete evidence.
+- Use `harness_observe_and_transition` when you have a clear stage transition and can summarize the observation; it avoids a separate context lookup just to copy an evidence ID.
 - Never fabricate evidence event IDs. Use IDs from Harness context or Harness tool results.
 - For complex Tasks, use the TaskNode tree to record recursive decomposition inside the focused Trace. New Traces normally already have one root node.
 - Use DFS traversal for debugging and narrow coding work by default. Use BFS traversal when the user asks for broad planning, architecture coverage, or parallelizable task discovery.

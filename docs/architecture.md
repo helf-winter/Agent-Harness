@@ -54,7 +54,7 @@ Workers
 
 Harness 是用户入口、Agent 身份层、记忆层和控制面，负责启动 Claude Code 并让模型以 Harness Agent 身份工作。Harness 不重写 Claude Code Agent Loop；模型推理、文件工具和 shell 执行仍由 Claude Code 提供，但这些能力被纳入 Harness 的 Session、Task、Trace、Stage 和证据账本中。MCP 不是外部审批系统，而是 Harness Agent 的 durable memory 与控制面。
 
-当前已实现的 Hook safety belt 是 lifecycle-aware `PreToolUse`：Harness 控制面工具和读工具在 `COMPLETE` 前放行，写工具仅在 `EXECUTE` 放行，`Bash` 仅在 `EXECUTE`、`VERIFY`、`REVIEW` 放行，`COMPLETE` 后拒绝继续工具调用。轻量记录使用 `harness_record_note`，不要求先查询上下文或收集证据 ID；需要证据约束的事实再使用 `harness_record_observation`。阶段转换和完成门禁仍由 Lifecycle Controller 做确定性校验。
+当前已实现的 Hook safety belt 是 lifecycle-aware `PreToolUse`：Harness 控制面工具和读工具在 `COMPLETE` 前放行，写工具仅在 `EXECUTE` 放行，`Bash` 仅在 `EXECUTE`、`VERIFY`、`REVIEW` 放行，`COMPLETE` 后拒绝继续工具调用。轻量记录使用 `harness_record_note`，不要求先查询上下文或收集证据 ID；需要证据约束的事实再使用 `harness_record_observation`。常规阶段推进可使用 `harness_observe_and_transition` 先记录观察再转换，避免为了复制证据 ID 而机械查询状态。阶段转换和完成门禁仍由 Lifecycle Controller 做确定性校验。
 
 默认入口 `harness` 会让 Claude Code 连接 Claude Code Router gateway，而不是在 Agent Harness 内保存上游供应商密钥。模型选择由 Claude Code 的 `/model` 命令触发，CCR 根据模型名路由到上游 provider。旧的 `glm`、`kimi`、`kimi3`、`ds`、`dsp` provider 快捷入口仍可用于兼容测试，但不是默认入口。
 
