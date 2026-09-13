@@ -11,6 +11,7 @@ import { SkillRegistry } from "../skills/skill-registry.js";
 import { EventLedger } from "../storage/event-ledger.js";
 import { TaskTreeService } from "../task-tree/task-tree-service.js";
 import { selectNextTaskNode } from "../task-tree/traversal.js";
+import { renderTaskTreeAscii } from "../task-tree/ascii-tree.js";
 import type {
   TaskNodeInput,
   TaskNodeProjection,
@@ -225,12 +226,41 @@ export class HarnessService {
     return { eventId: result.event.eventId };
   }
 
+  recordNote(summary: string): { eventId: string } {
+    if (!summary.trim()) throw new Error("Note summary is required.");
+    const context = this.getContext();
+    const result = this.#ledger.append({
+      eventType: "note.recorded",
+      runtimeInstanceId: this.runtimeInstanceId,
+      sessionId: context.sessionId,
+      taskId: context.taskId,
+      traceId: context.traceId,
+      ...(context.turnId ? { turnId: context.turnId } : {}),
+      stageId: context.currentStageId,
+      correlationId: context.traceId,
+      actor: { type: "agent", id: "claude-code" },
+      source: { adapter: "harness-mcp", adapterVersion: "0.1.0" },
+      policyVersion: "default-1",
+      payload: { summary },
+    });
+    this.#projection.projectPending(this.#ledger);
+    return { eventId: result.event.eventId };
+  }
+
   transitionStage(
     to: Stage,
     reason: string,
     evidenceEventIds: string[],
   ): HarnessContext {
     const context = this.getContext();
+    if (to === "VERIFY") {
+      const root = this.#projection.getTaskTree({ traceId: context.traceId }).root;
+      if (root && root.status !== "completed") {
+        throw new Error(
+          "VERIFY requires the root TaskNode to be completed first; aggregate sub-results into the root node.",
+        );
+      }
+    }
     const controller = this.#controller();
     controller.transition({
       sessionId: context.sessionId,
@@ -242,6 +272,24 @@ export class HarnessService {
     });
     this.#projection.projectPending(this.#ledger);
     return this.getContext();
+  }
+
+  recordObservationAndTransition(
+    to: Stage,
+    reason: string,
+    observationSummary: string,
+  ): { observationEventId: string; context: HarnessContext } {
+    if (!observationSummary.trim()) throw new Error("Observation summary is required.");
+    const context = this.getContext();
+    const latestEvidence = context.recentEvidence.at(-1);
+    if (!latestEvidence) {
+      throw new Error("At least one existing evidence event is required before observing and transitioning.");
+    }
+    const observation = this.recordObservation(observationSummary, [latestEvidence.eventId]);
+    return {
+      observationEventId: observation.eventId,
+      context: this.transitionStage(to, reason, [observation.eventId]),
+    };
   }
 
   getTaskTree(): TaskTreeProjection & {
@@ -256,6 +304,11 @@ export class HarnessService {
         bfs: selectNextTaskNode(tree.nodes, "bfs"),
       },
     };
+  }
+
+  renderTaskTree(): string {
+    const context = this.getContext();
+    return renderTaskTreeAscii(this.#projection.getTaskTree({ traceId: context.traceId }));
   }
 
   createTaskNodeRoot(input: TaskNodeInput): TaskTreeProjection {

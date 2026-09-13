@@ -2,6 +2,7 @@
 set -euo pipefail
 
 repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+working_directory="${AGENT_HARNESS_WORKING_DIRECTORY:-$(pwd -P)}"
 provider_file="${AGENT_HARNESS_ROUTER_FILE:-$HOME/.config/agent-harness/harness-router.env}"
 
 if [[ -f "$provider_file" ]]; then
@@ -42,6 +43,7 @@ unset CODEXL_CLAUDE_CODE_MODEL
 unset CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY
 
 export AGENT_HARNESS_CCR_PROFILE="$ccr_profile"
+export AGENT_HARNESS_WORKING_DIRECTORY="$working_directory"
 export CLAUDE_EXECUTABLE="$repo_root/scripts/ccr-claude.sh"
 
 printf 'Starting Agent Harness through Claude Code Router profile %s.\n' "$ccr_profile" >&2
@@ -51,7 +53,8 @@ cd "$repo_root"
 
 if [[ "${AGENT_HARNESS_DRY_RUN:-}" == "1" ]]; then
   printf 'CLAUDE_EXECUTABLE=%s\n' "$CLAUDE_EXECUTABLE"
-  printf 'npm run dev -- controlled-run'
+  printf 'AGENT_HARNESS_WORKING_DIRECTORY=%s\n' "$AGENT_HARNESS_WORKING_DIRECTORY"
+  printf 'npm run dev -- agent-run'
   for arg in "$@"; do
     printf ' %q' "$arg"
   done
@@ -59,4 +62,4 @@ if [[ "${AGENT_HARNESS_DRY_RUN:-}" == "1" ]]; then
   exit 0
 fi
 
-exec npm run dev -- controlled-run "$@"
+exec npm run dev -- agent-run "$@"

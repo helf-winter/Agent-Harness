@@ -26,7 +26,7 @@ server.registerTool(
   "harness_get_context",
   {
     description:
-      "Read the current Harness Task, Trace, lifecycle stage, and recent evidence IDs. Call this before requesting a stage transition.",
+      "Use when exact Task, Trace, lifecycle stage, or recent evidence IDs are needed for a concrete Harness Agent operation.",
     inputSchema: {},
   },
   async () => textResult(service.getContext()),
@@ -83,10 +83,22 @@ server.registerTool(
 );
 
 server.registerTool(
+  "harness_record_note",
+  {
+    description:
+      "Record a lightweight Harness Agent note for the focused Task without first collecting evidence IDs. Use for user preferences, design decisions, and durable context that should not block the current stage.",
+    inputSchema: {
+      summary: z.string().min(1),
+    },
+  },
+  async ({ summary }) => textResult(service.recordNote(summary)),
+);
+
+server.registerTool(
   "harness_transition_stage",
   {
     description:
-      "Request a deterministic lifecycle stage transition. The controller rejects skipped stages and nonexistent or out-of-scope evidence.",
+      "Commit a deterministic lifecycle stage transition. Harness validates skipped stages and nonexistent or out-of-scope evidence before accepting it.",
     inputSchema: {
       to: z.enum(STAGES),
       reason: z.string().min(1),
@@ -98,6 +110,21 @@ server.registerTool(
 );
 
 server.registerTool(
+  "harness_observe_and_transition",
+  {
+    description:
+      "Record a new Harness Agent observation from the latest focused-Trace evidence and immediately use it to commit a lifecycle stage transition. Use this when you know the next stage but do not need to manually inspect evidence IDs.",
+    inputSchema: {
+      to: z.enum(STAGES),
+      reason: z.string().min(1),
+      observationSummary: z.string().min(1),
+    },
+  },
+  async ({ to, reason, observationSummary }) =>
+    textResult(service.recordObservationAndTransition(to, reason, observationSummary)),
+);
+
+server.registerTool(
   "harness_get_task_tree",
   {
     description:
@@ -105,6 +132,18 @@ server.registerTool(
     inputSchema: {},
   },
   async () => textResult(service.getTaskTree()),
+);
+
+server.registerTool(
+  "harness_render_task_tree",
+  {
+    description:
+      "Render the focused Trace's TaskNode recursion tree as an ASCII diagram for display to the user.",
+    inputSchema: {},
+  },
+  async () => ({
+    content: [{ type: "text" as const, text: service.renderTaskTree() }],
+  }),
 );
 
 server.registerTool(

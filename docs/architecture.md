@@ -34,9 +34,9 @@ Harness Core
              |
              v
 Claude Code
-  |-- worker loop: 模型推理和具体代码执行
-  |-- plugin hooks: 工具调用前门禁、工具结果采集、Stop 采集
-  |-- harness MCP: 请求阶段转换、TaskNode、召回、结果提交
+  |-- execution substrate: 模型推理、文件工具和 shell 执行
+  |-- plugin hooks: 工具调用安全带、工具结果采集、Stop 采集
+  |-- harness MCP: 记忆记录、阶段转换、TaskNode、召回、结果提交
   `-- completed skill projection
              |
              v
@@ -52,11 +52,11 @@ Workers
   `-- Validation Runner / Deterministic Graders
 ```
 
-Harness 是用户入口、管理层和控制面，负责启动 Claude Code controlled mode。Harness 不重写 Claude Code Agent Loop；普通模型推理和具体代码执行仍由 Claude Code 完成，但工具调用必须先经过 Hook Policy Gate。Claude Code 可以提出工具调用和 MCP 请求，Harness 根据当前生命周期阶段、证据范围和完成门禁决定放行、拒绝或推进状态。
+Harness 是用户入口、Agent 身份层、记忆层和控制面，负责启动 Claude Code 并让模型以 Harness Agent 身份工作。Harness 不重写 Claude Code Agent Loop；模型推理、文件工具和 shell 执行仍由 Claude Code 提供，但这些能力被纳入 Harness 的 Session、Task、Trace、Stage 和证据账本中。MCP 不是外部审批系统，而是 Harness Agent 的 durable memory 与控制面。
 
-当前已实现的硬门禁是 lifecycle-aware `PreToolUse`：读工具在完成前放行，写工具仅在 `EXECUTE` 放行，`Bash` 仅在 `EXECUTE`、`VERIFY`、`REVIEW` 放行，`COMPLETE` 后拒绝继续工具调用。MCP 仍用于 Claude 向 Harness 请求阶段转换和记录 TaskNode，但是否转换成功由 Harness Controller 决定。
+当前已实现的 Hook safety belt 是 lifecycle-aware `PreToolUse`：Harness 控制面工具和读工具在 `COMPLETE` 前放行，写工具仅在 `EXECUTE` 放行，`Bash` 仅在 `EXECUTE`、`VERIFY`、`REVIEW` 放行，`COMPLETE` 后拒绝继续工具调用。轻量记录使用 `harness_record_note`，不要求先查询上下文或收集证据 ID；需要证据约束的事实再使用 `harness_record_observation`。常规阶段推进可使用 `harness_observe_and_transition` 先记录观察再转换，避免为了复制证据 ID 而机械查询状态。阶段转换和完成门禁仍由 Lifecycle Controller 做确定性校验。
 
-默认入口 `harness` 会让 Claude Code 连接 Claude Code Router gateway，而不是在 Agent Harness 内保存上游供应商密钥。模型选择由 Claude Code 的 `/model` 命令触发，CCR 根据模型名路由到上游 provider。旧的 `glm`、`kimi`、`ds`、`dsp` provider 快捷入口仍可用于兼容测试，但不是默认入口。
+默认入口 `harness` 会让 Claude Code 连接 Claude Code Router gateway，而不是在 Agent Harness 内保存上游供应商密钥。模型选择由 Claude Code 的 `/model` 命令触发，CCR 根据模型名路由到上游 provider。旧的 `glm`、`kimi`、`kimi3`、`ds`、`dsp` provider 快捷入口仍可用于兼容测试，但不是默认入口。
 
 ## 3. 标识与关联
 
@@ -97,7 +97,7 @@ Session 删除采用非级联策略：删除 Session 元数据和原始对话后
 
 ## 6. 自动晋升
 
-MVP 中 Skill 自动晋升要求：
+当前实现中 Skill 自动晋升要求：
 
 - development、validation、regression 和 holdout 必选 Case 全部通过。
 - 每项运行三次且结果稳定。
@@ -109,7 +109,7 @@ MVP 中 Skill 自动晋升要求：
 
 ## 7. 已实现的纵向闭环
 
-1. Claude Code Hook 和 MCP 形成 managed 生命周期，确定性 Result Evaluator 控制完成门禁。
+1. Claude Code 提供执行底座，Harness Agent prompt、Hook 和 MCP 形成统一的任务操作系统，确定性 Result Evaluator 控制完成门禁。
 2. 失败结果经 Curator、Schema、指纹去重和独立 worktree 复现进入 active Case。
 3. 成功结果生成带作用域和证据的 usable Experience，再生成 `testing` Skill。
 4. Validation Agent 对四类 active Case 各运行三次，先确认无 Skill 失败基线，再执行候选 Skill 和 solution Oracle。

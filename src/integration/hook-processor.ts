@@ -5,13 +5,15 @@ import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { EVENT_TYPES } from "../domain/event-types.js";
 import { createEventId, type CapturedEvent, type EventContext } from "../domain/events.js";
+import type { Stage } from "../domain/lifecycle.js";
 import { LifecycleController } from "../lifecycle/controller.js";
 import { ProjectionStore } from "../projections/projection-store.js";
+import type { TraceProjection } from "../projections/projection-store.js";
 import { REDACTION_RULES_VERSION } from "../security/redactor.js";
 import { EventLedger } from "../storage/event-ledger.js";
 import {
   evaluateToolPolicy,
-  type HarnessControlMode,
+  type HarnessSafetyMode,
 } from "./tool-policy.js";
 import {
   harnessDatabasePath,
@@ -45,6 +47,7 @@ export interface HookProcessResult {
   taskId?: string;
   traceId?: string;
   turnId?: string;
+  additionalContext?: string;
 }
 
 export class HookPolicyViolation extends Error {
@@ -62,7 +65,7 @@ export class HookProcessor {
   readonly #runtimeInstanceId: string;
   readonly #projectId: string;
   readonly #adapterVersion: string;
-  readonly #controlMode: HarnessControlMode;
+  readonly #safetyMode: HarnessSafetyMode;
 
   constructor(
     databasePath: string,
@@ -70,7 +73,8 @@ export class HookProcessor {
       runtimeInstanceId: string;
       projectId: string;
       adapterVersion: string;
-      controlMode?: HarnessControlMode;
+      safetyMode?: HarnessSafetyMode;
+      controlMode?: HarnessSafetyMode;
     },
   ) {
     this.#ledger = new EventLedger(databasePath);
@@ -78,7 +82,7 @@ export class HookProcessor {
     this.#runtimeInstanceId = options.runtimeInstanceId;
     this.#projectId = options.projectId;
     this.#adapterVersion = options.adapterVersion;
-    this.#controlMode = options.controlMode ?? "audit";
+    this.#safetyMode = options.safetyMode ?? options.controlMode ?? "audit";
   }
 
   process(input: ClaudeHookInput): HookProcessResult {
@@ -148,7 +152,7 @@ export class HookProcessor {
         ? evaluateToolPolicy(
             input,
             trace ? { currentStage: trace.currentStage } : {},
-            this.#controlMode,
+            this.#safetyMode,
           )
         : undefined;
     const mapped = mapHookEvent(input, scope, policyDecision);
@@ -162,6 +166,12 @@ export class HookProcessor {
       throw new HookPolicyViolation(policyDecision.reason);
     }
 
+    let additionalContext: string | undefined;
+    if (input.hook_event_name === "PostToolUse" && trace && mapped?.eventId) {
+      additionalContext = this.#handlePostToolUse(input, trace, mapped.eventId);
+      if (additionalContext) this.#projection.projectPending(this.#ledger);
+    }
+
     if (input.hook_event_name === "Stop" && trace) {
       scheduleEvolution(trace.traceId, input.cwd);
     }
@@ -169,6 +179,7 @@ export class HookProcessor {
     return {
       appendedEvents,
       sessionId,
+      ...(additionalContext ? { additionalContext } : {}),
       ...(task ? { taskId: task.taskId } : {}),
       ...(trace ? { traceId: trace.traceId } : {}),
       ...(turn ? { turnId: turn.turnId } : {}),
@@ -258,6 +269,56 @@ export class HookProcessor {
       source: { adapter: "claude-code", adapterVersion: this.#adapterVersion },
       policyVersion: "default-1",
     });
+  }
+
+  #handlePostToolUse(
+    input: ClaudeHookInput,
+    trace: TraceProjection,
+    evidenceEventId: string,
+  ): string | undefined {
+    const toolName = input.tool_name ?? "";
+    const rootComplete =
+      this.#projection.getTaskTree({ traceId: trace.traceId }).root?.status === "completed";
+
+    const targetStage = deriveStageFromTool(toolName, input.tool_input, rootComplete);
+    if (targetStage && targetStage !== trace.currentStage) {
+      new LifecycleController(this.#ledger, {
+        runtimeInstanceId: this.#runtimeInstanceId,
+        actor: { type: "controller", id: "lifecycle-controller" },
+        source: { adapter: "harness-core", adapterVersion: "0.1.0" },
+        policyVersion: "default-1",
+      }).deriveStage({
+        sessionId: trace.sessionId,
+        taskId: trace.taskId,
+        traceId: trace.traceId,
+        to: targetStage,
+        reason: `Auto-derived from ${toolName} tool behavior.`,
+        evidenceEventIds: [evidenceEventId],
+      });
+    }
+
+    const normalizedTool = toolName.split("__").at(-1) ?? toolName;
+    if (normalizedTool === "harness_complete_task_node") {
+      return this.#aggregationHint(trace.traceId, readNodeId(input.tool_input));
+    }
+    return undefined;
+  }
+
+  #aggregationHint(traceId: string, completedNodeId: string | undefined): string | undefined {
+    if (!completedNodeId) return undefined;
+    const tree = this.#projection.getTaskTree({ traceId });
+    const node = tree.nodes.find((candidate) => candidate.nodeId === completedNodeId);
+    if (!node?.parentNodeId) return undefined;
+    const parent = tree.nodes.find((candidate) => candidate.nodeId === node.parentNodeId);
+    if (!parent || parent.status === "completed") return undefined;
+    const siblings = tree.nodes.filter((candidate) => candidate.parentNodeId === parent.nodeId);
+    if (!siblings.every((sibling) => sibling.status === "completed" || sibling.status === "pruned")) {
+      return undefined;
+    }
+    return [
+      `TaskNode "${parent.title}" is ready to aggregate: all of its child nodes are resolved.`,
+      `Call harness_complete_task_node with nodeId "${parent.nodeId}" and a result summary combining the children's results.`,
+    ].join(" ");
   }
 
   close(): void {
@@ -409,7 +470,10 @@ export function processHookFromEnvironment(input: ClaudeHookInput): HookProcessR
     runtimeInstanceId: process.env.HARNESS_RUNTIME_INSTANCE_ID ?? `runtime_${randomUUID()}`,
     projectId: process.env.HARNESS_PROJECT_ID ?? stableProjectId(input.cwd),
     adapterVersion: process.env.HARNESS_CLAUDE_VERSION ?? "unknown",
-    controlMode: process.env.HARNESS_CONTROL_MODE === "enforce" ? "enforce" : "audit",
+    safetyMode:
+      process.env.HARNESS_SAFETY_MODE === "enforce" || process.env.HARNESS_CONTROL_MODE === "enforce"
+        ? "enforce"
+        : "audit",
   });
   try {
     return processor.process(input);
@@ -430,4 +494,45 @@ export function recordHookFailure(error: unknown): void {
     })}\n`,
     "utf8",
   );
+}
+
+const WRITE_TOOLS = new Set(["Edit", "Write", "MultiEdit", "NotebookEdit"]);
+
+const VERIFY_COMMAND_PATTERNS: readonly RegExp[] = [
+  /\b(npm|yarn|pnpm|bun)\s+(run\s+)?(test|typecheck|check|lint|build)\b/i,
+  /\b(tsc|eslint|pytest|jest|vitest|mocha|jasmine|ava|ruff|mypy|flake8)\b/,
+  /\b(go\s+test|cargo\s+test|make\s+(test|check)|gradle\s+test|mvn\s+test)\b/i,
+];
+
+function deriveStageFromTool(
+  toolName: string,
+  toolInput: unknown,
+  rootComplete: boolean,
+): Stage | undefined {
+  if (WRITE_TOOLS.has(toolName)) return "EXECUTE";
+  if (toolName === "Bash" && rootComplete && isVerificationCommand(readCommand(toolInput))) {
+    return "VERIFY";
+  }
+  return undefined;
+}
+
+function isVerificationCommand(command: string): boolean {
+  if (!command) return false;
+  return VERIFY_COMMAND_PATTERNS.some((pattern) => pattern.test(command));
+}
+
+function readCommand(toolInput: unknown): string {
+  if (toolInput && typeof toolInput === "object" && "command" in toolInput) {
+    const command = (toolInput as { command?: unknown }).command;
+    return typeof command === "string" ? command : "";
+  }
+  return "";
+}
+
+function readNodeId(toolInput: unknown): string | undefined {
+  if (toolInput && typeof toolInput === "object" && "nodeId" in toolInput) {
+    const nodeId = (toolInput as { nodeId?: unknown }).nodeId;
+    return typeof nodeId === "string" && nodeId ? nodeId : undefined;
+  }
+  return undefined;
 }

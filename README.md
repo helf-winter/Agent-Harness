@@ -18,9 +18,9 @@
 - Claude Code、Node、Git 与 Bash 环境诊断。
 - Session、Task、Turn、Trace 的可重放查询投影。
 - Claude Code Session、Prompt、工具和 Stop Hook Adapter。
-- `harness` / `harness controlled-run` 启动入口和 `harness trace` 查询命令。
-- Harness controlled mode 下的 Hook 工具策略门禁：读工具可在完成前使用，写工具仅在 `EXECUTE` 放行，`Bash` 仅在 `EXECUTE`、`VERIFY`、`REVIEW` 放行。
-- Harness MCP 上下文、Task 创建/切换、Observation 和阶段转换工具。
+- `harness` / `harness agent-run` 启动入口和 `harness trace` 查询命令；`controlled-run` 仅作为旧兼容别名保留。
+- Harness Agent mode 下的 Hook 安全带：Harness 控制面工具和读工具可在完成前使用，写工具仅在 `EXECUTE` 放行，`Bash` 仅在 `EXECUTE`、`VERIFY`、`REVIEW` 放行。
+- Harness MCP 上下文、轻量 Note、Task 创建/切换、Observation、组合观察推进和阶段转换工具。
 - Harness MCP 递归 TaskNode 创建、分解、DFS/BFS 选择和节点状态回写工具。
 - 自动发现 TypeScript 项目的 typecheck、build 和 test 命令。
 - 确定性 Result Evaluator；没有成功评价时不能进入 `COMPLETE`。
@@ -58,7 +58,7 @@ npm run typecheck
 npm test
 npm run build
 npm run harness
-npm run dev -- controlled-run
+npm run dev -- agent-run
 npm run dev -- trace list
 npm run dev -- task tree <task-id|trace-id>
 npm run dev -- task node <node-id>
@@ -83,10 +83,10 @@ harness
 该入口会：
 
 1. 启动或复用 Claude Code Router，也就是 `ccr`；
-2. 进入 Agent Harness controlled mode；
+2. 进入 Harness Agent mode；
 3. 由 Harness 调用 CCR 的 `default-claude-code` profile；
-4. 由 CCR 注入 gateway 地址、profile 身份凭据和模型路由，再启动 Claude Code worker；
-5. 自动加载 Harness 的四模型选择器，进入 Claude 后使用 `/model` 切换。
+4. 由 CCR 注入 gateway 地址、profile 身份凭据和模型路由，再启动 Claude Code；
+5. 自动加载 Harness 的五模型选择器，进入 Claude 后使用 `/model` 切换。
 
 可选配置文件：
 
@@ -100,11 +100,13 @@ nano ~/.config/agent-harness/harness-router.env
 通常不需要创建该文件。只有使用了其他 CCR Claude profile，或不希望 Harness 自动启动
 CCR 时才需要修改。上游模型供应商 API Key 继续只在 CCR UI 中管理。
 
-进入 Claude 后用 `/model` 选择以下四个模型：
+进入 Claude 后用 `/model` 选择以下五个模型：
 
 ```text
 /model ark/glm-5.3-flash
+/model ark/glm-5.3
 /model ark/kimi-k2.7-code
+/model ark/kimi-k3
 /model deepseek/deepseek-v4-flash
 /model deepseek/deepseek-v4-pro
 ```
@@ -124,14 +126,17 @@ bash scripts/install-claude-shortcuts.sh
 harness
 ```
 
+`harness` 应在你要处理的项目目录里执行。快捷脚本会回到 Agent Harness 仓库加载自身代码，
+但会保留调用时的工作目录作为 Claude Code 的项目目录。
+
 ## 兼容入口：直接 provider 启动
 
 以下旧入口仍保留，方便绕过 CCR 直接指定 provider/model；但默认推荐使用 `harness` +
 CCR，再用 Claude Code `/model` 切换。
 
-Claude Code 使用 Anthropic 协议，因此火山方舟在 Claude Code 中的 Base URL 是
-`https://ark.cn-beijing.volces.com/api/coding`。带 `/v3` 的地址是 OpenAI 协议入口，
-不能直接配置给 Claude Code。
+火山方舟在当前配置中使用 Base URL：
+`https://ark.cn-beijing.volces.com/api/coding/v3`。DeepSeek 继续使用官方
+Anthropic 兼容入口。
 
 先在 WSL Bash 中创建只属于当前用户的密钥文件：
 
@@ -151,45 +156,52 @@ npm run cc
 菜单会显示完整模型名：
 
 ```text
-1) glm   Volcano Ark / glm-5.3-flash
-2) kimi  Volcano Ark / kimi-k2.7-code
-3) ds    DeepSeek official / deepseek-v4-flash
-4) dsp   DeepSeek official / deepseek-v4-pro
+1) glm    Volcano Ark / glm-5.3-flash
+2) glm53  Volcano Ark / glm-5.3
+3) kimi   Volcano Ark / kimi-k2.7-code
+4) kimi3  Volcano Ark / kimi-k3
+5) ds     DeepSeek official / deepseek-v4-flash
+6) dsp    DeepSeek official / deepseek-v4-pro
 ```
 
 也可以用以下短命令直接进入指定模型：
 
 ```bash
 npm run glm
+npm run glm53
 npm run kimi
+npm run kimi3
 npm run ds
 npm run dsp
 ```
 
-对应关系为：`glm` 使用方舟 `glm-5.3-flash`，`kimi` 使用方舟
-`kimi-k2.7-code`，`ds` 使用 DeepSeek `deepseek-v4-flash`，`dsp` 使用
-DeepSeek `deepseek-v4-pro`。
+对应关系为：`glm` 使用方舟 `glm-5.3-flash`，`glm53` 使用方舟
+`glm-5.3`，`kimi` 使用方舟 `kimi-k2.7-code`，`kimi3` 使用方舟 `kimi-k3`，`ds` 使用 DeepSeek
+`deepseek-v4-flash`，`dsp` 使用 DeepSeek `deepseek-v4-pro`。
 
-`cc`、`glm`、`kimi`、`ds` 和 `dsp` 也是 Harness-first 兼容入口：先进入 Agent
-Harness controlled mode，再由 Harness 启动 Claude Code 并挂载 Hook、MCP 和 worker
-prompt。区别是它们在启动前已经固定了 provider/model，不依赖 CCR `/model` 路由。
+`cc`、`glm`、`glm53`、`kimi`、`kimi3`、`ds` 和 `dsp` 也是 Harness-first 兼容入口：先进入
+Agent Harness mode，再由 Harness 启动 Claude Code 并挂载 Hook、MCP 和 Harness
+Agent prompt。区别是它们在启动前已经固定了 provider/model，不依赖 CCR `/model`
+路由。
 
 原来的完整命令仍然保留：
 
 ```bash
 npm run claude:ark:glm
+npm run claude:ark:glm53
 npm run claude:ark:kimi
+npm run claude:ark:kimi3
 npm run claude:deepseek:flash
 npm run claude:deepseek:pro
 ```
 
-方舟模型分别为 `glm-5.3-flash`、`kimi-k2.7-code`；DeepSeek 使用官方 Anthropic
-兼容地址与当前模型 `deepseek-v4-flash`、`deepseek-v4-pro`。命令行环境变量优先于密钥文件。
+方舟模型分别为 `glm-5.3-flash`、`glm-5.3`、`kimi-k2.7-code`、`kimi-k3`；DeepSeek 使用官方
+Anthropic 兼容地址与当前模型 `deepseek-v4-flash`、`deepseek-v4-pro`。命令行环境变量优先于密钥文件。
 
 独立 Skill 验证可使用相同供应商，但必须提供单独的隔离验证密钥：
 
 ```bash
-export HARNESS_VALIDATION_BASE_URL=https://ark.cn-beijing.volces.com/api/coding
+export HARNESS_VALIDATION_BASE_URL=https://ark.cn-beijing.volces.com/api/coding/v3
 export HARNESS_VALIDATION_AUTH_TOKEN="$ARK_API_KEY"
 export HARNESS_VALIDATION_MODEL=glm-5.3-flash
 ```
@@ -209,7 +221,9 @@ export HARNESS_VALIDATION_MODEL=glm-5.3-flash
 
 - Claude Code CLI 执行真实模型任务前必须具备一种有效凭据：Anthropic 登录，或所选兼容供应商的 API Key。使用本项目的供应商启动命令时不需要再执行 `/login`。
 - 独立 Skill 验证刻意不读取用户 Claude 登录或系统钥匙串；真实验证需单独设置仅用于隔离验证的 `HARNESS_VALIDATION_AUTH_TOKEN`。第三方供应商还需设置 `HARNESS_VALIDATION_BASE_URL` 和 `HARNESS_VALIDATION_MODEL`；旧的 `HARNESS_VALIDATION_API_KEY` 仍向后兼容。未设置时 Skill 保持 `testing`。
-- Task 的语义分类仍由 Claude 通过 Harness MCP 辅助完成，确定性投影、作用域检查和工具门禁由 Harness Core 完成。
-- TaskNode 树已可通过 MCP 记录和查询；当前版本提供 DFS/BFS 下一节点建议，并通过 lifecycle-aware Hook gate 限制 Claude Code 在错误阶段执行写入或 Bash。
+- 进入 `harness` 后，模型以 Harness Agent 身份工作；Harness MCP 是它的 durable memory 和控制面，而不是外部审批系统。
+- 常规阶段推进可使用组合工具先记录观察再转换，避免为了复制证据 ID 而机械查询 Harness 状态。
+- Task 的语义分类由 Harness Agent 通过 MCP 记录，确定性投影、作用域检查和关键门禁由 Harness Core 完成。
+- TaskNode 树已可通过 MCP 记录和查询；当前版本提供 DFS/BFS 下一节点建议，并通过 lifecycle-aware Hook safety belt 限制错误阶段的写入或 Bash。
 - 第一阶段验证环境以 Bash 为基准；原生 PowerShell 仅用于本项目开发，不属于正式运行目标。
 - Git worktree 隔离文件状态，但不是完整 OS/网络沙箱；验证器因此只开放读取、编辑和受限的 npm/git Bash 命令。高风险 Skill 会直接验证失败。

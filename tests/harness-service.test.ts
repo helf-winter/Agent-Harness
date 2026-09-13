@@ -56,6 +56,58 @@ describe("Harness MCP service", () => {
     service.close();
   });
 
+  it("records a lightweight Harness note without requiring a prior context lookup", () => {
+    const directory = mkdtempSync(join(tmpdir(), "agent-harness-service-"));
+    temporaryDirectories.push(directory);
+    const databasePath = join(directory, "harness.sqlite");
+    const processor = new HookProcessor(databasePath, {
+      runtimeInstanceId: "runtime-service",
+      projectId: "project-one",
+      adapterVersion: "2.1.220",
+    });
+    processor.process(input("SessionStart", { source: "startup" }));
+    processor.process(input("UserPromptSubmit", { prompt: "Record this product decision" }));
+    processor.close();
+
+    const service = new HarnessService(databasePath, "runtime-service");
+    const note = service.recordNote("Harness Agent should record without first querying state.");
+
+    expect(note.eventId).toMatch(/^evt_/);
+    expect(service.getContext().recentEvidence.at(-1)).toMatchObject({
+      eventId: note.eventId,
+      eventType: "note.recorded",
+    });
+    service.close();
+  });
+
+  it("records an observation and advances lifecycle without caller-provided evidence IDs", () => {
+    const directory = mkdtempSync(join(tmpdir(), "agent-harness-service-"));
+    temporaryDirectories.push(directory);
+    const databasePath = join(directory, "harness.sqlite");
+    const processor = new HookProcessor(databasePath, {
+      runtimeInstanceId: "runtime-service",
+      projectId: "project-one",
+      adapterVersion: "2.1.220",
+    });
+    processor.process(input("SessionStart", { source: "startup" }));
+    processor.process(input("UserPromptSubmit", { prompt: "Fix the lifecycle ergonomics" }));
+    processor.close();
+
+    const service = new HarnessService(databasePath, "runtime-service");
+    const result = service.recordObservationAndTransition(
+      "RECALL",
+      "The user request is understood and ready for recall.",
+      "The user wants Harness Agent lifecycle operations to avoid ritual context lookup.",
+    );
+
+    expect(result.observationEventId).toMatch(/^evt_/);
+    expect(result.context.currentStage).toBe("RECALL");
+    expect(result.context.recentEvidence.at(-1)).toMatchObject({
+      eventType: "stage.transitioned",
+    });
+    service.close();
+  });
+
   it("rejects fabricated evidence IDs", () => {
     const directory = mkdtempSync(join(tmpdir(), "agent-harness-service-"));
     temporaryDirectories.push(directory);

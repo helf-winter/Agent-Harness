@@ -15,6 +15,13 @@ afterEach(() => {
 });
 
 describe("Harness CCR launcher", () => {
+  it("presents agent-run as the official Claude execution entrypoint", () => {
+    const cliSource = readFileSync(resolve("src/cli.ts"), "utf8");
+
+    expect(cliSource).toContain("harness agent-run [claude arguments...]");
+    expect(cliSource).not.toContain("harness controlled-run [claude arguments...]");
+  });
+
   it("starts Agent Harness through a CCR-owned Claude launcher", () => {
     const directory = mkdtempSync(join(tmpdir(), "agent-harness-ccr-"));
     temporaryDirectories.push(directory);
@@ -34,7 +41,7 @@ describe("Harness CCR launcher", () => {
     expect(result.stderr).toContain("Starting Agent Harness through Claude Code Router");
     expect(result.stdout).toContain("CLAUDE_EXECUTABLE=");
     expect(result.stdout).toContain("scripts/ccr-claude.sh");
-    expect(result.stdout).toContain("npm run dev -- controlled-run --permission-mode acceptEdits");
+    expect(result.stdout).toContain("npm run dev -- agent-run --permission-mode acceptEdits");
     expect(result.stdout).not.toContain("ANTHROPIC_BASE_URL");
     expect(result.stdout).not.toContain("ANTHROPIC_AUTH_TOKEN");
     expect(result.stdout).not.toContain("ANTHROPIC_API_KEY");
@@ -45,9 +52,13 @@ describe("Harness CCR launcher", () => {
     temporaryDirectories.push(directory);
     const fakeBin = join(directory, "bin");
     const captureFile = join(directory, "ccr-arguments.txt");
+    const settingsCaptureFile = join(directory, "ccr-settings.json");
     const fakeCcr = join(fakeBin, "ccr");
     mkdirSync(fakeBin);
-    writeFileSync(fakeCcr, `#!/usr/bin/env bash\nprintf '%s\\n' "$@" > "$CCR_CAPTURE_FILE"\n`);
+    writeFileSync(
+      fakeCcr,
+      `#!/usr/bin/env bash\nprintf '%s\\n' "$@" > "$CCR_CAPTURE_FILE"\ncp "$5" "$CCR_SETTINGS_CAPTURE_FILE"\n`,
+    );
     chmodSync(fakeCcr, 0o700);
 
     const result = spawnSync("bash", ["scripts/ccr-claude.sh", "--version"], {
@@ -57,22 +68,28 @@ describe("Harness CCR launcher", () => {
         ...process.env,
         PATH: `${fakeBin}${delimiter}${process.env.PATH ?? ""}`,
         CCR_CAPTURE_FILE: captureFile,
+        CCR_SETTINGS_CAPTURE_FILE: settingsCaptureFile,
         AGENT_HARNESS_CCR_PROFILE: "test-claude-profile",
       },
     });
 
     expect(result.status, result.stderr || result.stdout).toBe(0);
-    expect(readFileSync(captureFile, "utf8").trim().split("\n")).toEqual([
+    const ccrArguments = readFileSync(captureFile, "utf8").trim().split("\n");
+    const settingsPath = ccrArguments[4];
+
+    expect(ccrArguments).toEqual([
       "test-claude-profile",
       "cli",
       "--",
       "--settings",
-      resolve("config/claude-model-picker.json"),
+      settingsPath,
       "--version",
     ]);
+    const renderedSettings = JSON.parse(readFileSync(settingsCaptureFile, "utf8")) as { apiKeyHelper: string };
+    expect(renderedSettings.apiKeyHelper).toBe(`bash ${resolve("scripts/ccr-api-key-helper.sh")}`);
   });
 
-  it("exposes only the four supported provider models in the Claude picker", () => {
+  it("exposes only the supported provider models in the Claude picker", () => {
     const settings = JSON.parse(readFileSync(resolve("config/claude-model-picker.json"), "utf8")) as {
       apiKeyHelper: string;
       availableModels: string[];
@@ -85,7 +102,9 @@ describe("Harness CCR launcher", () => {
     };
     const expectedModels = [
       "ark/glm-5.3-flash",
+      "ark/glm-5.3",
       "ark/kimi-k2.7-code",
+      "ark/kimi-k3",
       "deepseek/deepseek-v4-flash",
       "deepseek/deepseek-v4-pro",
     ];
@@ -125,6 +144,42 @@ describe("Harness CCR launcher", () => {
     const directory = mkdtempSync(join(tmpdir(), "agent-harness-shortcuts-"));
     temporaryDirectories.push(directory);
     const binDirectory = join(directory, "bin");
+    const configDirectory = join(directory, "config");
+
+    const result = spawnSync("bash", ["scripts/install-claude-shortcuts.sh"], {
+      cwd: resolve("."),
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        AGENT_HARNESS_BIN_DIR: binDirectory,
+        AGENT_HARNESS_CONFIG_DIR: configDirectory,
+      },
+    });
+
+    expect(result.status, result.stderr || result.stdout).toBe(0);
+    const harnessShortcut = readFileSync(join(binDirectory, "harness"), "utf8");
+    expect(harnessShortcut).toContain("agent-harness ccr shortcut");
+    expect(harnessShortcut).toContain("exec bash scripts/harness.sh");
+    expect(readFileSync(join(binDirectory, "cc"), "utf8")).toContain("claude-provider-menu.sh");
+    expect(readFileSync(join(binDirectory, "glm53"), "utf8")).toContain("ark-glm53");
+    expect(readFileSync(join(binDirectory, "kimi3"), "utf8")).toContain("ark-kimi3");
+    const globalSettings = JSON.parse(readFileSync(join(configDirectory, "claude-model-picker.json"), "utf8")) as {
+      apiKeyHelper: string;
+    };
+    expect(globalSettings.apiKeyHelper).toBe(`bash ${resolve("scripts/ccr-api-key-helper.sh")}`);
+    expect(harnessShortcut).toContain(`AGENT_HARNESS_CLAUDE_SETTINGS="${join(configDirectory, "claude-model-picker.json")}"`);
+  });
+
+  it("updates old unmarked Agent Harness provider shortcuts", () => {
+    const directory = mkdtempSync(join(tmpdir(), "agent-harness-old-shortcuts-"));
+    temporaryDirectories.push(directory);
+    const binDirectory = join(directory, "bin");
+    mkdirSync(binDirectory);
+    writeFileSync(
+      join(binDirectory, "glm"),
+      "#!/usr/bin/env bash\nset -euo pipefail\ncd \"/old/repo\"\nexec bash scripts/claude-provider.sh \"ark-glm\" \"$@\"\n",
+      { mode: 0o700 },
+    );
 
     const result = spawnSync("bash", ["scripts/install-claude-shortcuts.sh"], {
       cwd: resolve("."),
@@ -136,9 +191,39 @@ describe("Harness CCR launcher", () => {
     });
 
     expect(result.status, result.stderr || result.stdout).toBe(0);
-    const harnessShortcut = readFileSync(join(binDirectory, "harness"), "utf8");
-    expect(harnessShortcut).toContain("agent-harness ccr shortcut");
-    expect(harnessShortcut).toContain("exec bash scripts/harness.sh");
-    expect(readFileSync(join(binDirectory, "cc"), "utf8")).toContain("claude-provider-menu.sh");
+    const shortcut = readFileSync(join(binDirectory, "glm"), "utf8");
+    expect(shortcut).toContain("agent-harness claude provider shortcut");
+    expect(shortcut).toContain("AGENT_HARNESS_WORKING_DIRECTORY");
+  });
+
+  it("preserves the caller working directory when using the installed harness shortcut", () => {
+    const directory = mkdtempSync(join(tmpdir(), "agent-harness-shortcut-cwd-"));
+    temporaryDirectories.push(directory);
+    const binDirectory = join(directory, "bin");
+    const projectDirectory = join(directory, "project");
+    mkdirSync(projectDirectory);
+
+    const install = spawnSync("bash", ["scripts/install-claude-shortcuts.sh"], {
+      cwd: resolve("."),
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        AGENT_HARNESS_BIN_DIR: binDirectory,
+      },
+    });
+    expect(install.status, install.stderr || install.stdout).toBe(0);
+
+    const result = spawnSync(join(binDirectory, "harness"), ["--print", "pwd"], {
+      cwd: projectDirectory,
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        AGENT_HARNESS_DRY_RUN: "1",
+        AGENT_HARNESS_START_CCR: "0",
+      },
+    });
+
+    expect(result.status, result.stderr || result.stdout).toBe(0);
+    expect(result.stdout).toContain(`AGENT_HARNESS_WORKING_DIRECTORY=${projectDirectory}`);
   });
 });

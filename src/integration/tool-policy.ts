@@ -1,7 +1,7 @@
 import type { Stage } from "../domain/lifecycle.js";
 import type { ClaudeHookInput } from "./hook-processor.js";
 
-export type HarnessControlMode = "audit" | "enforce";
+export type HarnessSafetyMode = "audit" | "enforce";
 
 export interface ToolPolicyContext {
   currentStage?: Stage;
@@ -9,75 +9,74 @@ export interface ToolPolicyContext {
 
 export interface ToolPolicyDecision {
   allowed: boolean;
-  mode: HarnessControlMode;
+  mode: HarnessSafetyMode;
   reason: string;
 }
 
-const READ_ONLY_TOOLS = new Set([
-  "Read",
-  "Grep",
-  "Glob",
-  "LS",
-  "TodoRead",
-  "NotebookRead",
-]);
-
-const WRITE_TOOLS = new Set([
-  "Edit",
-  "MultiEdit",
-  "Write",
-  "NotebookEdit",
-]);
-
-const BASH_ALLOWED_STAGES = new Set<Stage>(["EXECUTE", "VERIFY", "REVIEW"]);
-const WRITE_ALLOWED_STAGES = new Set<Stage>(["EXECUTE"]);
+/**
+ * Irreversible operations the harness refuses to run silently. Approval and
+ * simulation are left to Claude Code's native permission system; the harness
+ * only hard-stops the handful of commands that destroy state with no cheap
+ * recovery path, and records every Bash invocation to the ledger regardless.
+ */
+const DESTRUCTIVE_COMMAND_PATTERNS: readonly RegExp[] = [
+  // rm -rf / rm -fr (recursive + force combined) and rm --recursive
+  // Deliberately narrow: a plain `rm -f` or `rm -r` on a single path is common
+  // and recoverable-enough to leave to Claude Code's native approval.
+  /\brm\s+(-rf|-fr)\b/i,
+  /\brm\s+--recursive\b/i,
+  // git reset --hard (discards uncommitted work)
+  /\bgit\s+reset\s+--hard\b/i,
+  // git clean -f / -fd / --force (deletes untracked files)
+  /\bgit\s+clean\s+(-[a-z]*[fd][a-z]*|--force)\b/i,
+  // git push --force / -f (overwrites remote history)
+  /\bgit\s+push\b[^\n]*\s(-f|--force)(\s|$)/i,
+  // git branch -D (deletes a branch)
+  /\bgit\s+branch\s+-D\b/i,
+  // drop table / database / schema
+  /\bdrop\s+(table|database|schema)\b/i,
+];
 
 export function evaluateToolPolicy(
   input: ClaudeHookInput,
   context: ToolPolicyContext,
-  mode: HarnessControlMode,
+  mode: HarnessSafetyMode,
 ): ToolPolicyDecision {
   if (mode === "audit") {
-    return { allowed: true, mode, reason: "Harness control mode is audit." };
+    return { allowed: true, mode, reason: "Harness safety mode is audit." };
   }
 
   const toolName = input.tool_name ?? "unknown";
-  const stage = context.currentStage;
-  if (!stage) {
+
+  if (isHarnessControlPlaneTool(toolName)) {
+    return { allowed: true, mode, reason: `Harness allows control-plane tool ${toolName}.` };
+  }
+
+  if (context.currentStage === "COMPLETE") {
+    return { allowed: false, mode, reason: "Harness blocks tool use after COMPLETE." };
+  }
+
+  if (toolName === "Bash" && isDestructiveCommand(input.tool_input?.command)) {
     return {
       allowed: false,
       mode,
-      reason: "Harness cannot authorize tool use before an active lifecycle stage exists.",
+      reason: "Harness blocks destructive command; use an explicit, recoverable alternative.",
     };
   }
-  if (stage === "COMPLETE") {
-    return { allowed: false, mode, reason: "Harness blocks tool use after COMPLETE." };
-  }
-  if (READ_ONLY_TOOLS.has(toolName)) {
-    return { allowed: true, mode, reason: `Harness allows read-only ${toolName} during ${stage}.` };
-  }
-  if (WRITE_TOOLS.has(toolName)) {
-    return WRITE_ALLOWED_STAGES.has(stage)
-      ? { allowed: true, mode, reason: `Harness allows write tool ${toolName} during EXECUTE.` }
-      : {
-          allowed: false,
-          mode,
-          reason: `Harness blocks write tool ${toolName} during ${stage}; advance to EXECUTE first.`,
-        };
-  }
-  if (toolName === "Bash") {
-    return BASH_ALLOWED_STAGES.has(stage)
-      ? { allowed: true, mode, reason: `Harness allows Bash during ${stage}.` }
-      : {
-          allowed: false,
-          mode,
-          reason: `Harness blocks Bash during ${stage}; advance to EXECUTE, VERIFY, or REVIEW first.`,
-        };
-  }
 
-  return {
-    allowed: false,
-    mode,
-    reason: `Harness has no allow rule for tool ${toolName} during ${stage}.`,
-  };
+  return { allowed: true, mode, reason: `Harness allows ${toolName}.` };
+}
+
+function isDestructiveCommand(command: unknown): boolean {
+  if (typeof command !== "string" || !command.trim()) return false;
+  return DESTRUCTIVE_COMMAND_PATTERNS.some((pattern) => pattern.test(command));
+}
+
+function isHarnessControlPlaneTool(toolName: string): boolean {
+  return (
+    toolName === "harness" ||
+    toolName.startsWith("harness_") ||
+    toolName.startsWith("mcp__harness__") ||
+    toolName.startsWith("mcp__plugin_agent-harness")
+  );
 }

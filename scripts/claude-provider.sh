@@ -1,13 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+working_directory="${AGENT_HARNESS_WORKING_DIRECTORY:-$(pwd -P)}"
+
 usage() {
   cat >&2 <<'EOF'
 Usage: scripts/claude-provider.sh <profile> [harness/claude arguments...]
 
 Profiles:
   ark-glm          Volcano Ark / glm-5.3-flash
+  ark-glm53        Volcano Ark / glm-5.3
   ark-kimi         Volcano Ark / kimi-k2.7-code
+  ark-kimi3        Volcano Ark / kimi-k3
   deepseek-flash   DeepSeek official / deepseek-v4-flash
   deepseek-pro     DeepSeek official / deepseek-v4-pro
 
@@ -35,15 +39,29 @@ fi
 case "$profile" in
   ark-glm)
     provider_name="Volcano Ark"
-    base_url="https://ark.cn-beijing.volces.com/api/coding"
+    base_url="https://ark.cn-beijing.volces.com/api/coding/v3"
     model="glm-5.3-flash"
+    api_key="${ARK_API_KEY:-}"
+    key_name="ARK_API_KEY"
+    ;;
+  ark-glm53)
+    provider_name="Volcano Ark"
+    base_url="https://ark.cn-beijing.volces.com/api/coding/v3"
+    model="glm-5.3"
     api_key="${ARK_API_KEY:-}"
     key_name="ARK_API_KEY"
     ;;
   ark-kimi)
     provider_name="Volcano Ark"
-    base_url="https://ark.cn-beijing.volces.com/api/coding"
+    base_url="https://ark.cn-beijing.volces.com/api/coding/v3"
     model="kimi-k2.7-code"
+    api_key="${ARK_API_KEY:-}"
+    key_name="ARK_API_KEY"
+    ;;
+  ark-kimi3)
+    provider_name="Volcano Ark"
+    base_url="https://ark.cn-beijing.volces.com/api/coding/v3"
+    model="kimi-k3"
     api_key="${ARK_API_KEY:-}"
     key_name="ARK_API_KEY"
     ;;
@@ -93,10 +111,12 @@ export ANTHROPIC_MODEL="$model"
 export ANTHROPIC_DEFAULT_OPUS_MODEL="$model"
 export ANTHROPIC_DEFAULT_SONNET_MODEL="$model"
 export ANTHROPIC_DEFAULT_HAIKU_MODEL="$model"
+export AGENT_HARNESS_WORKING_DIRECTORY="$working_directory"
 
 printf 'Starting Agent Harness with %s (%s).\n' "$provider_name" "$model" >&2
 if [[ "${AGENT_HARNESS_DRY_RUN:-}" == "1" ]]; then
-  printf 'npm run dev -- controlled-run --model %s' "$model"
+  printf 'AGENT_HARNESS_WORKING_DIRECTORY=%s\n' "$AGENT_HARNESS_WORKING_DIRECTORY"
+  printf 'npm run dev -- agent-run --model %s' "$model"
   for arg in "$@"; do
     printf ' %q' "$arg"
   done
@@ -104,4 +124,4 @@ if [[ "${AGENT_HARNESS_DRY_RUN:-}" == "1" ]]; then
   exit 0
 fi
 
-exec npm run dev -- controlled-run --model "$model" "$@"
+exec npm run dev -- agent-run --model "$model" "$@"
