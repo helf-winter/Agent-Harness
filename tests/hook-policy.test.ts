@@ -47,7 +47,7 @@ function startTrace(processor: HookProcessor): { taskId: string; traceId: string
 }
 
 describe("Harness Agent Hook safety belt", () => {
-  it("blocks write tools while the lifecycle is still in INTAKE", () => {
+  it("allows write tools during INTAKE (stages are derived, not gates)", () => {
     const directory = mkdtempSync(join(tmpdir(), "agent-harness-policy-"));
     temporaryDirectories.push(directory);
     const databasePath = join(directory, "harness.sqlite");
@@ -60,6 +60,46 @@ describe("Harness Agent Hook safety belt", () => {
           tool_name: "Edit",
           tool_use_id: "edit-in-intake",
           tool_input: { file_path: "src/example.ts", old_string: "a", new_string: "b" },
+        }),
+      ),
+    ).not.toThrow();
+
+    processor.close();
+  });
+
+  it("blocks destructive rm commands", () => {
+    const directory = mkdtempSync(join(tmpdir(), "agent-harness-policy-"));
+    temporaryDirectories.push(directory);
+    const databasePath = join(directory, "harness.sqlite");
+    const processor = safetyProcessor(databasePath);
+    startTrace(processor);
+
+    expect(() =>
+      processor.process(
+        hookInput("PreToolUse", {
+          tool_name: "Bash",
+          tool_use_id: "destructive-rm",
+          tool_input: { command: "rm -rf /tmp/cache" },
+        }),
+      ),
+    ).toThrow(HookPolicyViolation);
+
+    processor.close();
+  });
+
+  it("blocks git reset --hard commands", () => {
+    const directory = mkdtempSync(join(tmpdir(), "agent-harness-policy-"));
+    temporaryDirectories.push(directory);
+    const databasePath = join(directory, "harness.sqlite");
+    const processor = safetyProcessor(databasePath);
+    startTrace(processor);
+
+    expect(() =>
+      processor.process(
+        hookInput("PreToolUse", {
+          tool_name: "Bash",
+          tool_use_id: "destructive-reset",
+          tool_input: { command: "git reset --hard HEAD~1" },
         }),
       ),
     ).toThrow(HookPolicyViolation);

@@ -170,6 +170,67 @@ export class LifecycleController {
       },
     });
   }
+
+  /**
+   * Record a stage reached by observed tool behavior rather than by an explicit
+   * model assertion. Unlike `transition`, this skips the strict transition graph
+   * so the runtime can jump forward (e.g. INTAKE -> EXECUTE on the first write)
+   * without the model manually walking every intermediate stage. It still
+   * requires in-scope evidence and refuses to reach COMPLETE or HUMAN_REVIEW,
+   * which stay model-driven decisions.
+   */
+  deriveStage(input: TransitionInput): AppendResult {
+    const state = this.getTraceState(input.traceId);
+    if (state.sessionId !== input.sessionId || state.taskId !== input.taskId) {
+      throw new Error("Trace scope does not match its original Session and Task.");
+    }
+    if (input.to === "COMPLETE" || input.to === "HUMAN_REVIEW") {
+      throw new Error(`Stage ${input.to} must be reached via an explicit transition.`);
+    }
+    const evidence = this.ledger.getByIds(input.evidenceEventIds);
+    if (evidence.length === 0) {
+      throw new Error("At least one evidence event is required.");
+    }
+    if (evidence.length !== new Set(input.evidenceEventIds).size) {
+      throw new Error("One or more evidence events do not exist.");
+    }
+    if (
+      evidence.some((event) => {
+        const inTrace = event.traceId === input.traceId || event.correlationId === input.traceId;
+        const atTaskScope = event.taskId === input.taskId && !event.traceId;
+        const atSessionScope = event.sessionId === input.sessionId && !event.taskId;
+        return !inTrace && !atTaskScope && !atSessionScope;
+      })
+    ) {
+      throw new Error("Evidence belongs to a different Trace scope.");
+    }
+    if (input.to === state.currentStage) {
+      throw new Error(`Trace is already at stage ${state.currentStage}.`);
+    }
+
+    const causationId = input.evidenceEventIds.at(-1);
+    return this.ledger.append({
+      eventType: EVENT_TYPES.STAGE_TRANSITIONED,
+      sessionId: input.sessionId,
+      taskId: input.taskId,
+      traceId: input.traceId,
+      stageId: createEventId("stage"),
+      runtimeInstanceId: this.identity.runtimeInstanceId,
+      correlationId: input.traceId,
+      ...(causationId ? { causationId } : {}),
+      actor: this.identity.actor,
+      source: this.identity.source,
+      policyVersion: this.identity.policyVersion,
+      payload: {
+        from: state.currentStage,
+        to: input.to,
+        reason: input.reason,
+        evidenceEventIds: input.evidenceEventIds,
+        previousStageId: state.currentStageId,
+        derived: true,
+      },
+    });
+  }
 }
 
 function isStage(value: unknown): value is Stage {

@@ -433,6 +433,21 @@ export class ProjectionStore {
   }
 
   findActiveSessionForRuntime(runtimeInstanceId: string): SessionProjection | undefined {
+    // Prefer the active session that currently owns a focused Task: a runtime can
+    // outlive several claude sessions (restarts, /new), and only the one with a
+    // focused Task is meaningful to the MCP control plane.
+    const focused = this.#database
+      .prepare(`
+        SELECT s.* FROM sessions s
+        JOIN session_task_focus f ON f.session_id = s.session_id
+        JOIN tasks t ON t.task_id = f.task_id
+        WHERE s.runtime_instance_id = ? AND s.status = 'active'
+          AND t.status IN ('active', 'suspended', 'waiting')
+        ORDER BY f.updated_at DESC LIMIT 1
+      `)
+      .get(runtimeInstanceId) as SessionRow | undefined;
+    if (focused) return mapSession(focused);
+
     const row = this.#database
       .prepare(`
         SELECT * FROM sessions

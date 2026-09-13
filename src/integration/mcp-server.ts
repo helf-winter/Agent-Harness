@@ -135,6 +135,18 @@ server.registerTool(
 );
 
 server.registerTool(
+  "harness_render_task_tree",
+  {
+    description:
+      "Render the focused Trace's TaskNode recursion tree as an ASCII diagram for display to the user.",
+    inputSchema: {},
+  },
+  async () => ({
+    content: [{ type: "text" as const, text: service.renderTaskTree() }],
+  }),
+);
+
+server.registerTool(
   "harness_create_task_node_root",
   {
     description:

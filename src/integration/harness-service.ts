@@ -11,6 +11,7 @@ import { SkillRegistry } from "../skills/skill-registry.js";
 import { EventLedger } from "../storage/event-ledger.js";
 import { TaskTreeService } from "../task-tree/task-tree-service.js";
 import { selectNextTaskNode } from "../task-tree/traversal.js";
+import { renderTaskTreeAscii } from "../task-tree/ascii-tree.js";
 import type {
   TaskNodeInput,
   TaskNodeProjection,
@@ -252,6 +253,14 @@ export class HarnessService {
     evidenceEventIds: string[],
   ): HarnessContext {
     const context = this.getContext();
+    if (to === "VERIFY") {
+      const root = this.#projection.getTaskTree({ traceId: context.traceId }).root;
+      if (root && root.status !== "completed") {
+        throw new Error(
+          "VERIFY requires the root TaskNode to be completed first; aggregate sub-results into the root node.",
+        );
+      }
+    }
     const controller = this.#controller();
     controller.transition({
       sessionId: context.sessionId,
@@ -295,6 +304,11 @@ export class HarnessService {
         bfs: selectNextTaskNode(tree.nodes, "bfs"),
       },
     };
+  }
+
+  renderTaskTree(): string {
+    const context = this.getContext();
+    return renderTaskTreeAscii(this.#projection.getTaskTree({ traceId: context.traceId }));
   }
 
   createTaskNodeRoot(input: TaskNodeInput): TaskTreeProjection {

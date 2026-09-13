@@ -15,7 +15,10 @@ async function readStandardInput(): Promise<string> {
 try {
   const raw = await readStandardInput();
   const input = JSON.parse(raw) as ClaudeHookInput;
-  processHookFromEnvironment(input);
+  const result = processHookFromEnvironment(input);
+  if (result.additionalContext) {
+    process.stdout.write(JSON.stringify({ additionalContext: result.additionalContext }));
+  }
 } catch (error) {
   if (error instanceof HookPolicyViolation) {
     console.error(error.message);
